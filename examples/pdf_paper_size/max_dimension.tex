@@ -1,0 +1,24 @@
+% From TeX by Topic:
+%	\maxdimen 16383.99999pt; the largest legal dimension.
+% and
+%	Internally TEX works with multiples of a smallest dimension: the scaled point. Dimensions larger (in absolute value) than 2^30 − 1sp, which is about 5.75 metres or 18.9 feet, are illegal.
+%
+% source: http://tex.stackexchange.com/questions/420/whats-the-absolute-largest-paper-size-permissible-with-pdflatex
+
+\documentclass{article}
+\pagestyle{empty}
+\usepackage{prooftree}
+\usepackage[top=1cm, right=1cm, left=1cm, bottom=1cm]{geometry}
+
+\begin{document}
+
+\setlength{\pdfpagewidth}{575cm}
+\setlength{\pdfpageheight}{575cm}
+
+\begin{tiny}
+\begin{displaymath}
+	...
+\end{displaymath}
+\end{tiny}
+
+\end{document}
