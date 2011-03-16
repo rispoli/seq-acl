@@ -11,8 +11,6 @@ expand(F, Depth, Principals, ([F, Premises_tree], Rule)) :-
     inference_rule(F, Depth, Principals, Premises, Rule), !,
     expand_premises(Premises, Depth, Principals, Premises_tree).
 
-%expand(F, _, _, ([F, []], 'bogus')).
-
 expand_l((Σ, M, Γ, Δ), Depth, Principals, ([(Σ, M, Γ, Δ), Premises_tree], Rule)) :-
     member(X, Γ),
     inference_rule_l(X, (Σ, M, Γ, Δ), Depth, Premises, Rule), !,
@@ -29,11 +27,18 @@ expand_r((Σ, M, Γ, Δ), Depth, Principals, ([(Σ, M, Γ, Δ), Premises_tree], 
 expand_r(F, Depth, Principals, T) :-
     expand_l(F, Depth, Principals, T).
 
+expand_sem(F, Depth, Principals, ([F, Premises_tree], Rule)) :-
+    inference_rule_sem(F, Premises, Rule), !,
+    expand_premises(Premises, Depth, Principals, Premises_tree).
+
+expand_sem(F, Depth, Principals, T) :-
+    expand_r(F, Depth, Principals, T).
+
 search_nodes((Σ, M, Γ, Δ), _, _, ([(Σ, M, Γ, Δ), []], Rule)) :-
     axiom(M, Γ, Δ, Rule), !.
 
 search_nodes(F, Depth, Principals, T) :-
-    expand_r(F, Depth, Principals, T).
+    expand_sem(F, Depth, Principals, T).
 
 foldr(_, Z, [], Z) :- !.
 

@@ -11,10 +11,14 @@ distance([], _, _, _) :-
     !, fail.
 
 distance(L, U, X, 1) :-
-    member(U <= X, L).
+    member(U <= X, L);
+    (member(T, L), T =.. [F | As], member(F, [c, p, r, s]), [U, _, X] = As).
 
 distance(L, U, X, D) :-
-    select(Y <= X, L, L_),
+    (
+        select(Y <= X, L, L_);
+        (select(T, L, L_), T =.. [F | As], member(F, [c, p, r, s]), [Y, _, X] = As)
+    ),
     X \= Y,
     distance(L_, U, Y, D_),
     D is D_ + 1.

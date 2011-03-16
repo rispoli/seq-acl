@@ -18,6 +18,34 @@ axiom(_, _, Δ, '\\top\\mbox{R}') :-
 axiom(_, Γ, _, '\\bot\\mbox{L}') :-
     member(_ : '\\bot', Γ).
 
+% mon-S
+inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [s(X, A, W) | M], Γ, Δ)], '\\mbox{mon-S}') :-
+    member(X <= Y, M),
+    member(s(Y, A, Z), M),
+    member(Z <= W, M),
+    \+member(s(X, A, W), M).
+
+% mon-C
+inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [c(X, A, W) | M], Γ, Δ)], '\\mbox{mon-C}') :-
+    member(X <= Y, M),
+    member(c(Y, A, Z), M),
+    member(Z <= W, M),
+    \+member(c(X, A, W), M).
+
+% mon-R
+inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [r(X, A, W) | M], Γ, Δ)], '\\mbox{mon-R}') :-
+    member(X <= Y, M),
+    member(r(Y, A, Z), M),
+    member(Z <= W, M),
+    \+member(r(X, A, W), M).
+
+% mon-P
+inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [p(W, A, X) | M], Γ, Δ)], '\\mbox{mon-P}') :-
+    member(X <= Y, M),
+    member(p(Z, A, Y), M),
+    member(Z <= W, M),
+    \+member(p(W, A, X), M).
+
 % ∧: right
 inference_rule_r(X : Alpha and Beta, (Σ, M, Γ, Δ), [(Σ, M, Γ, [X : Alpha | Δ]), (Σ, M, Γ, [X : Beta | Δ])], '\\land\\mbox{R}').
 
@@ -54,7 +82,7 @@ inference_rule_l(X : Alpha or Beta, (Σ, M, Γ, Δ), _, [(Σ, M, [X : Alpha | Γ
     delete(Γ, X : Alpha or Beta, Γ_).
 
 % →: left
-inference_rule_l(X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, [(Σ, M, Γ, [Y : Alpha | Δ]), (Σ, M, [Y : Beta | Γ], Δ)], '\\rightarrow\\mbox{L}') :-
+inference_rule_l(X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, [(Σ, M, [Y : Beta | Γ], Δ), (Σ, M, Γ, [Y : Alpha | Δ])], '\\rightarrow\\mbox{L}') :-
     member(X <= Y, M),
     \+member(Y : Alpha, Δ),
     \+member(Y : Beta, Γ),
@@ -81,67 +109,6 @@ inference_rule_l(X : p(A, Alpha), (Σ, M, Γ, Δ), _, [([Y | Σ], [p(X, A, Y) | 
     gensym(y_, Y),
     delete(Γ, X : p(A, Alpha), Γ_).
 
-% mon-S
-inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [s(X, A, W) | M], Γ, Δ)], '\\mbox{mon-S}') :-
-    member(X <= Y, M),
-    member(s(Y, A, Z), M),
-    member(Z <= W, M),
-    \+member(s(X, A, W), M).
-
-% mon-C
-inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [c(X, A, W) | M], Γ, Δ)], '\\mbox{mon-C}') :-
-    member(X <= Y, M),
-    member(c(Y, A, Z), M),
-    member(Z <= W, M),
-    \+member(c(X, A, W), M).
-
-% mon-R
-inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [r(X, A, W) | M], Γ, Δ)], '\\mbox{mon-R}') :-
-    member(X <= Y, M),
-    member(r(Y, A, Z), M),
-    member(Z <= W, M),
-    \+member(r(X, A, W), M).
-
-% mon-P
-inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [p(W, A, X) | M], Γ, Δ)], '\\mbox{mon-P}') :-
-    member(X <= Y, M),
-    member(p(Z, A, Y), M),
-    member(Z <= W, M),
-    \+member(p(W, A, X), M).
-
-% s-I-SS
-inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [s(X, A, Z) | M], Γ, Δ)], '\\mbox{s-I-SS}') :-
-    member(s(X, _, Y), M),
-    member(s(Y, A, Z), M),
-    \+member(s(X, A, Z), M).
-
-% s-C2P
-inference_rule((Σ, M, Γ, Δ), Depth, Principals, [([Y | Σ], [c(X, A, Y), p(X, A, Y) | M], Γ, Δ)], '\\mbox{s-C2P}') :-
-    gensym(y_, Y),
-    member(X, Σ),
-    member(A, Principals),
-    max_distance(M, u, X, Distance),
-    Distance =< Depth,
-    \+member(c(X, A, _), M),
-    \+member(p(X, A, _), M).
-
-% s-del-C
-inference_rule((Σ, M, Γ, Δ), Depth, Principals, [(Σ, [c(X, A, Y) | M], Γ, Δ), ([Z | Σ], [s(X, A, Z), c(Z, B, Y) | M_], Γ, Δ)], '\\mbox{s-del-C}') :-
-    member(c(X, B, Y), M),
-    \+member(c(X, A, Y), M),
-    member(A, Principals),
-    gensym(z_, Z),
-    delete(M, c(X, B, Y), M_),
-    \+member(s(X, A, _), M_),
-    \+member(c(_, B, Y), M_),
-    max_distance(M, u, X, Distance),
-    Distance =< Depth.
-
-% s-RS
-inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [r(X, A, Y) | M], Γ, Δ)], '\\mbox{s-RS}') :-
-    member(s(X, A, Y), M),
-    \+member(r(X, A, Y), M).
-
 % Refl
 inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [X <= X | M], Γ, Δ)], '\\mbox{Refl}') :-
     member(X, Σ),
@@ -152,3 +119,36 @@ inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [X <= Z | M], Γ, Δ)], '\\mbox{Tran
     member(X <= Y, M),
     member(Y <= Z, M),
     \+member(X <= Z, M).
+
+% s-I-SS
+inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [s(X, A, Z) | M], Γ, Δ)], '\\mbox{s-I-SS}') :-
+    member(s(X, _, Y), M),
+    member(s(Y, A, Z), M),
+    \+member(s(X, A, Z), M).
+
+% s-del-C
+inference_rule((Σ, M, Γ, Δ), Depth, Principals, [(Σ, [c(X, A, Y) | M], Γ, Δ), ([Z | Σ], [s(X, A, Z), c(Z, B, Y) | M], Γ, Δ)], '\\mbox{s-del-C}') :-
+    member(c(X, B, Y), M),
+    member(A, Principals),
+    \+member(c(X, A, Y), M),
+    (member(s(X, A, C), M) ->
+        (\+member(c(C, B, Y), M));
+        true),
+    gensym(z_, Z),
+    max_distance(M, u, X, Distance),
+    Distance =< Depth.
+
+% s-RS
+inference_rule((Σ, M, Γ, Δ), _, _, [(Σ, [r(X, A, Y) | M], Γ, Δ)], '\\mbox{s-RS}') :-
+    member(s(X, A, Y), M),
+    \+member(r(X, A, Y), M).
+
+% s-C2P
+inference_rule((Σ, M, Γ, Δ), Depth, Principals, [([Y | Σ], [c(X, A, Y), p(X, A, Y) | M], Γ, Δ)], '\\mbox{s-C2P}') :-
+    gensym(y_, Y),
+    member(X, Σ),
+    member(A, Principals),
+    max_distance(M, u, X, Distance),
+    Distance =< Depth,
+    \+member(c(X, A, _), M),
+    \+member(p(X, A, _), M).
