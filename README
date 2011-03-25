@@ -1,0 +1,14 @@
+Seq-ACL+: A Decidable Theorem Prover for ACL+
+
+To lunch Seq-ACL+
+
+1. Run SWI-Prolog ($ swipl)
+2. Load latexify package (?- [latexify].)
+
+Now you can prove formulas by typing
+
+?- prove(a->a).
+
+Or you can run test files as follows
+
+?- ['examples/tests.pl'].

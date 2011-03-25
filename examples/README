@@ -1,0 +1,7 @@
+This directory contains the examples reported in the paper.
+
+[test_name].pl : calls the predicate prove(.) over example "test_name"
+[test_name]_l.pl: calls the predicate latexify(.,file.tex) over example "test_name"
+                  and writes the proof in a .tex file
+
+gen_image.sh: A shell script to compile the .tex produced by latexify.

@@ -10,7 +10,7 @@ depth(T, D) :-
 distance([], _, _, _) :-
     !, fail.
 
-distance(L, U, X, 1) :-
+distance(L, U, X, 0) :-
     member(U <= X, L);
     (member(T, L), T =.. [F | As], member(F, [c, p, r, s]), [U, _, X] = As).
 
