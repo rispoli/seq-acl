@@ -110,6 +110,16 @@ inference_rule_l(X : p(A, Alpha), (Σ, M, Γ, Δ), _, Used, Used, [([Y | Σ], [p
     gensym(y_, Y),
     delete(Γ, X : p(A, Alpha), Γ_).
 
+sub_formula(_, []) :- !, fail.
+
+sub_formula(F, [H | _]) :-
+    (F = H;
+    (H =.. [_ | As],
+    sub_formula(F, As))), !.
+
+sub_formula(F, [_ | T]) :-
+    sub_formula(F, T).
+
 % Refl
 inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [X <= X | M], Γ, Δ)], '\\mbox{Refl}') :-
     member(X, Σ),
@@ -128,10 +138,16 @@ inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [s(X, A, Z) | M], Γ, Δ
     \+member(s(X, A, Z), M).
 
 % s-del-C
-inference_rule((Σ, M, Γ, Δ), Depth, Principals, Used, [c(X, B, Y) | Used], [(Σ, [c(X, A, Y) | M], Γ, Δ), ([Z | Σ], [s(X, A, Z), c(Z, B, Y) | M], Γ, Δ)], '\\mbox{s-del-C}') :-
+inference_rule((Σ, M, Γ, Δ), Depth, Principals, Used, [(c(X, B, Y), A) | Used], [(Σ, [c(X, A, Y) | M], Γ, Δ), ([Z | Σ], [s(X, A, Z), c(Z, B, Y) | M], Γ, Δ)], '\\mbox{s-del-C}') :-
     member(c(X, B, Y), M),
-    \+member(c(X, B, Y), Used),
     member(A, Principals),
+    \+member((c(X, B, Y), A), Used),
+    member(X : c(A, F), Γ),
+    sub_formula(F, Δ),
+    \+member(c(X, A, Y), M),
+    (member(s(X, A, C), M) ->
+        (\+member(c(C, B, Y), M));
+        true),
     gensym(z_, Z),
     max_distance(M, u, X, Distance),
     Distance =< Depth.
