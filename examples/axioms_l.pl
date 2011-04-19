@@ -21,3 +21,4 @@
 ?- latexify(('A' ratified '\\varphi') -> ('A' says '\\varphi'), 'examples/RS.tex').
 ?- latexify(('A' ratified ('\\varphi' -> '\\psi')) -> ('A' ratified '\\varphi') -> ('A' ratified '\\psi'), 'examples/K-R.tex').
 ?- latexify(('A' ratified '\\varphi') -> 'B' says 'A' says '\\varphi', 'examples/R-I-SS.tex').
+?- latexify(('A' => 'B') and ('A' says '\\varphi') -> ('B' says '\\varphi'), 'examples/speaks-for.tex').

@@ -21,3 +21,4 @@
 ?- prove(('A' ratified '\\varphi') -> ('A' says '\\varphi')).
 ?- prove(('A' ratified ('\\varphi' -> '\\psi')) -> ('A' ratified '\\varphi') -> ('A' ratified '\\psi')).
 ?- prove(('A' ratified '\\varphi') -> 'B' says 'A' says '\\varphi').
+?- prove(('A' => 'B') and ('A' says '\\varphi') -> ('B' says '\\varphi')).

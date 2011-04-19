@@ -2,6 +2,7 @@
    op(600, yfx, or),
    op(650, xfy, says),
    op(650, xfy, ratified),
+   op(650, xfy, =>),
    op(700, xfy, ->),
    op(800, xfx, :),
    op(700, xfx, <=).
@@ -110,6 +111,16 @@ inference_rule_l(X : p(A, Alpha), (Σ, M, Γ, Δ), _, Used, Used, [([Y | Σ], [p
     gensym(y_, Y),
     delete(Γ, X : p(A, Alpha), Γ_).
 
+% SF
+inference_rule_l(X : B => C, (Σ, M, Γ, Δ), _, Used, Used, [(Σ, [s(X, B, Y) | M], Γ, Δ)], '\\mbox{\\textsf{SF}}') :-
+    member(s(X, C, Y), M),
+    \+member(s(X, B, Y), M).
+
+% S-Trans
+inference_rule_l(X : A => B, (Σ, M, Γ, Δ), _, Used, Used, [(Σ, M, [X : A => C | Γ], Δ)], '\\mbox{\\textsf{S-Trans}}') :-
+    member(X : B => C, Γ),
+    \+member(X : A => C, Γ).
+
 sub_formula(_, []) :- !, fail.
 
 sub_formula(F, [H | _]) :-
@@ -119,6 +130,12 @@ sub_formula(F, [H | _]) :-
 
 sub_formula(F, [_ | T]) :-
     sub_formula(F, T).
+
+% S-Refl
+inference_rule((Σ, M, Γ, Δ), _, Principals, Used, Used, [(Σ, M, [X : A => A | Γ], Δ)], '\\mbox{\\textsf{S-Refl}}') :-
+    member(X, Σ),
+    member(A, Principals),
+    \+member(X : A => A, Γ).
 
 % Refl
 inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [X <= X | M], Γ, Δ)], '\\mbox{Refl}') :-

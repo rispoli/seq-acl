@@ -23,6 +23,7 @@ functor2string(and, ' \\land ').
 functor2string(or, ' \\lor ').
 functor2string(says, ' \\mbox{ \\textsf{says} } ').
 functor2string(ratified, ' \\mbox{ \\textsf{ratified} } ').
+functor2string(=>, ' => ').
 functor2string(->, ' \\rightarrow ').
 functor2string(:, ' : ').
 functor2string(<=, ' \\leq ').
@@ -69,10 +70,7 @@ print_sequent(Indentation, (Σ, M, Γ_, Δ)) :-
 print_tree(Indentation, ([Conclusion, Premises], Rule)) :-
     format('~w\\prooftree~n', Indentation),
     string_concat(Indentation, '\t', Deeper_indentation),
-    ((Premises \= []) ->
-        maplist(print_tree(Deeper_indentation), Premises);
-        format('')
-    ),
+    maplist(print_tree(Deeper_indentation), Premises),
     format('~w\\justifies~n', Indentation),
     print_sequent(Deeper_indentation, Conclusion),
     format('~w\\using~n', Indentation),
@@ -80,10 +78,21 @@ print_tree(Indentation, ([Conclusion, Premises], Rule)) :-
     format(Deeper_indentation), format(Rule_n),
     format('~w\\endprooftree~n', Indentation).
 
+print_leaves(([(_, M, Γ, Δ), []], '')) :-
+    format('~w\\prooftree~n', ''),
+    format('~w\\justifies~n', ''),
+    print_sequent('\t', ([], M, Γ, Δ)),
+    format('~w\\endprooftree~n', ''), !.
+
+print_leaves(([_, Premises], _)) :-
+    maplist(print_leaves, Premises).
+
 latexify(Formula, Filename) :-
     prove(Formula, Sequent),
     tell(Filename),
     format('\\documentclass{article}~n\\pagestyle{empty}~n\\usepackage{amsthm, amsmath, amssymb}~n\\usepackage{prooftree}~n\\begin{document}~n~n\\begin{displaymath}~n'),
-    print_tree('', Sequent),
+    (non_provable ->
+        print_leaves(Sequent);
+        print_tree('', Sequent)),
     format('\\end{displaymath}~n~n\\end{document}'),
     told.

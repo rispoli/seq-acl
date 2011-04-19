@@ -1,4 +1,4 @@
-depth(T, 1) :-
+depth(T, 0) :-
     atom(T), !.
 
 depth(T, D) :-
