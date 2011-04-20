@@ -1,5 +1,6 @@
 :- [deduction_tree].
 :- [op_pri].
+:- [m2dot].
 
 stringConcat([], Output, Output).
 
@@ -37,8 +38,11 @@ parentheses(Parent_functor, Functor) :-
     op_pri(Y, Functor), !,
     X \= Y.
 
-proposition2string(_, A, A) :-
-    atom(A), !.
+proposition2string(_, A, O) :-
+    atom(A),
+    (wildcard_match('[a-z]_[0-9]*', A) ->
+        (sub_string(A, 0, 1, Left, Label), Take is Left - 1, sub_string(A, 2, Take, 0, Index), stringConcat([Label, '_{', Index, '}'], '', O));
+        O = A), !.
 
 proposition2string(_, CPRS, String) :-
     CPRS =.. [F_, X_, A_, Y_],
@@ -78,21 +82,23 @@ print_tree(Indentation, ([Conclusion, Premises], Rule)) :-
     format(Deeper_indentation), format(Rule_n),
     format('~w\\endprooftree~n', Indentation).
 
-print_leaves(([(_, M, Γ, Δ), []], '')) :-
+print_leaves(Filename_, ([(_, M, Γ, Δ), []], '')) :-
+    atom_concat(Filename_, '.dot', Filename),
     format('~w\\prooftree~n', ''),
     format('~w\\justifies~n', ''),
     print_sequent('\t', ([], M, Γ, Δ)),
+    m2dot(M, Γ, Δ, Filename),
     format('~w\\endprooftree~n', ''), !.
 
-print_leaves(([_, Premises], _)) :-
-    maplist(print_leaves, Premises).
+print_leaves(Filename, ([_, Premises], _)) :-
+    maplist(print_leaves(Filename), Premises).
 
 latexify(Formula, Filename) :-
     prove(Formula, Sequent),
     tell(Filename),
     format('\\documentclass{article}~n\\pagestyle{empty}~n\\usepackage{amsthm, amsmath, amssymb}~n\\usepackage{prooftree}~n\\begin{document}~n~n\\begin{displaymath}~n'),
     (non_provable ->
-        print_leaves(Sequent);
+        print_leaves(Filename, Sequent);
         print_tree('', Sequent)),
     format('\\end{displaymath}~n~n\\end{document}'),
     told.
