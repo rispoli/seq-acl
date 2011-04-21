@@ -83,7 +83,8 @@ print_tree(Indentation, ([Conclusion, Premises], Rule)) :-
     format('~w\\endprooftree~n', Indentation).
 
 print_leaves(Filename_, ([(_, M, Γ, Δ), []], '')) :-
-    atom_concat(Filename_, '.dot', Filename),
+    gensym(Filename_, Filename__),
+    atom_concat(Filename__, '.dot', Filename),
     format('~w\\prooftree~n', ''),
     format('~w\\justifies~n', ''),
     print_sequent('\t', ([], M, Γ, Δ)),

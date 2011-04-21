@@ -56,8 +56,7 @@ speaks_for_refl(_ : X => X).
 
 m2dot(M, Γ, Δ, Filename) :-
     tell(Filename),
-    gensym(g_, G),
-    format('digraph ~w {~n\tu [ texlbl = "$u$" ];~n', G),
+    format('digraph G {~n\tu [ texlbl = "$u$" ];~n'),
     exclude(speaks_for_refl, Γ, Γ_sfr),
     print_worlds(Γ_sfr, Δ),
     maplist(get_label, Γ_sfr, Labels_Γ),
