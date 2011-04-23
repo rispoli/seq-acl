@@ -52,14 +52,11 @@ print_worlds([], Δ) :-
     format('\\end{matrix}$" ];~n'),
     print_worlds([], NotXs_Δ).
 
-speaks_for_refl(_ : X => X).
-
 m2dot(M, Γ, Δ, Filename) :-
     tell(Filename),
     format('digraph G {~n\tu [ texlbl = "$u$" ];~n'),
-    exclude(speaks_for_refl, Γ, Γ_sfr),
-    print_worlds(Γ_sfr, Δ),
-    maplist(get_label, Γ_sfr, Labels_Γ),
+    print_worlds(Γ, Δ),
+    maplist(get_label, Γ, Labels_Γ),
     maplist(get_label, Δ, Labels_Δ),
     union(Labels_Γ, Labels_Δ, Labels),
     print_graph(M, [u | Labels]),
