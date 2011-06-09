@@ -12,12 +12,12 @@ distance([], _, _, _) :-
 
 distance(L, U, X, 0) :-
     member(U <= X, L);
-    (member(T, L), T =.. [F | As], member(F, [c, p, r, s]), [U, _, X] = As).
+    member(s(U, _, X), L).
 
 distance(L, U, X, D) :-
     (
         select(Y <= X, L, L_);
-        (select(T, L, L_), T =.. [F | As], member(F, [c, p, r, s]), [Y, _, X] = As)
+        select(s(Y, _, X), L, L_)
     ),
     X \= Y,
     distance(L_, U, Y, D_),

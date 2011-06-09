@@ -23,14 +23,9 @@ inner_join([Head | Tail], Separator, TempString, Output) :-
 functor2string(and, ' \\land ').
 functor2string(or, ' \\lor ').
 functor2string(says, ' \\mbox{ \\textsf{says} } ').
-functor2string(ratified, ' \\mbox{ \\textsf{ratified} } ').
-functor2string(=>, ' => ').
 functor2string(->, ' \\rightarrow ').
 functor2string(:, ' : ').
 functor2string(<=, ' \\leq ').
-functor2string(c, 'C').
-functor2string(p, 'P').
-functor2string(r, 'R').
 functor2string(s, 'S').
 
 parentheses(Parent_functor, Functor) :-
@@ -44,13 +39,11 @@ proposition2string(_, A, O) :-
         (sub_string(A, 0, 1, Left, Label), Take is Left - 1, sub_string(A, 2, Take, 0, Index), stringConcat([Label, '_{', Index, '}'], '', O));
         O = A), !.
 
-proposition2string(_, CPRS, String) :-
-    CPRS =.. [F_, X_, A_, Y_],
-    functor2string(F_, F),
+proposition2string(_, s(X_, A_, Y_), String) :-
     proposition2string(_, X_, X),
     proposition2string(_, A_, A),
     proposition2string(_, Y_, Y),
-    stringConcat([X, ' ', F, '_', A, ' ', Y], '', String), !.
+    stringConcat([X, ' S_', A, ' ', Y], '', String), !.
 
 proposition2string(Parent_functor, B_op, String) :-
     B_op =.. [Functor | Arguments],
