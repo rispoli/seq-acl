@@ -25,38 +25,40 @@ inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [s(X, A, W) | M], Γ, Δ)], '\\mbox{mo
     \+member(s(X, A, W), M).
 
 % ∧: right
-inference_rule_r(X : Alpha and Beta, (Σ, M, Γ, Δ), [(Σ, M, Γ, [X : Alpha | Δ]), (Σ, M, Γ, [X : Beta | Δ])], '\\land\\mbox{R}').
+inference_rule_r(X : Alpha and Beta, (Σ, M, Γ, Δ), _, [(Σ, M, Γ, [X : Alpha | Δ]), (Σ, M, Γ, [X : Beta | Δ])], '\\land\\mbox{R}').
 
 % ∨: right
-inference_rule_r(X: Alpha or Beta, (Σ, M, Γ, Δ), [(Σ, M, Γ, [X : Alpha, X : Beta | Δ])], '\\lor\\mbox{R}').
+inference_rule_r(X: Alpha or Beta, (Σ, M, Γ, Δ), _, [(Σ, M, Γ, [X : Alpha, X : Beta | Δ])], '\\lor\\mbox{R}').
 
 % →: right
-inference_rule_r(X : Alpha -> Beta, (Σ, M, Γ, Δ), [([Y | Σ], [X <= Y | M], [Y : Alpha | Γ], [Y : Beta | Δ])], '\\rightarrow\\mbox{R}') :-
-    gensym(y_, Y).
+inference_rule_r(X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, [([Y | Σ], [X <= Y | M], [Y : Alpha | Γ], [Y : Beta | Δ])], '\\rightarrow\\mbox{R}') :-
+    gensym(y_, Y),
+    max_distance(M, u, X, Distance),
+    Distance =< Depth.
 
 % says: right
-inference_rule_r(X : A says Alpha, (Σ, M, Γ, Δ), [([Y | Σ], [s(X, A, Y) | M], Γ, [Y : Alpha | Δ])], '\\mbox{\\textsf{says} R}') :-
-    gensym(y_, Y).
+inference_rule_r(X : A says Alpha, (Σ, M, Γ, Δ), Depth, [([Y | Σ], [s(X, A, Y) | M], Γ, [Y : Alpha | Δ])], '\\mbox{\\textsf{says} R}') :-
+    gensym(y_, Y),
+    max_distance(M, u, X, Distance),
+    Distance =< Depth.
 
 % ∧: left
-inference_rule_l(X : Alpha and Beta, (Σ, M, Γ, Δ), _, Used, Used, [(Σ, M, [X : Alpha, X : Beta | Γ_], Δ)], '\\land\\mbox{L}') :-
+inference_rule_l(X : Alpha and Beta, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [X : Alpha, X : Beta | Γ_], Δ)], '\\land\\mbox{L}') :-
     delete(Γ, X : Alpha and Beta, Γ_).
 
 % ∨: left
-inference_rule_l(X : Alpha or Beta, (Σ, M, Γ, Δ), _, Used, Used, [(Σ, M, [X : Alpha | Γ_], Δ), (Σ, M, [X : Beta | Γ_], Δ)], '\\lor\\mbox{L}') :-
+inference_rule_l(X : Alpha or Beta, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [X : Alpha | Γ_], Δ), (Σ, M, [X : Beta | Γ_], Δ)], '\\lor\\mbox{L}') :-
     delete(Γ, X : Alpha or Beta, Γ_).
 
 % →: left
-inference_rule_l(X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Used, [(X : Alpha -> Beta, Y) | Used], [(Σ, M, [Y : Beta | Γ], Δ), (Σ, M, Γ, [Y : Alpha | Δ])], '\\rightarrow\\mbox{L}') :-
+inference_rule_l(X : Alpha -> Beta, (Σ, M, Γ, Δ), Used, [(X : Alpha -> Beta, Y) | Used], [(Σ, M, [Y : Beta | Γ], Δ), (Σ, M, Γ, [Y : Alpha | Δ])], '\\rightarrow\\mbox{L}') :-
     member(X <= Y, M),
     \+member(Y : Alpha, Δ),
     \+member(Y : Beta, Γ),
-    \+member((X : Alpha -> Beta, Y), Used),
-    max_distance(M, u, Y, Distance),
-    Distance =< Depth.
+    \+member((X : Alpha -> Beta, Y), Used).
 
 % says: left
-inference_rule_l(X : A says Alpha, (Σ, M, Γ, Δ), _, Used, Used, [(Σ, M, [Y : Alpha | Γ], Δ)], '\\mbox{\\textsf{says} L}') :-
+inference_rule_l(X : A says Alpha, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [Y : Alpha | Γ], Δ)], '\\mbox{\\textsf{says} L}') :-
     member(s(X, A, Y), M),
     \+member(Y : Alpha, Γ).
 
@@ -78,6 +80,6 @@ inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [s(X, A, Z) | M], Γ, Δ
     \+member(s(X, A, Z), M).
 
 % C
-inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [s(Y, A, Y) | M], Γ, Δ)], '\\mbox{C}') :-
+inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [s(Y, A, Y) | M], Γ, Δ)], '\\mbox{s-C}') :-
     member(s(_, A, Y), M),
     \+member(s(Y, A, Y), M).
