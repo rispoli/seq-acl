@@ -1,6 +1,6 @@
-Seq-ACL+: A Decidable Theorem Prover for ACL+
+Seq-ACL Countermodels: A Decidable Theorem Prover for ACL with Countermodels generation
 
-To lunch Seq-ACL+
+To lunch Seq-ACL Countermodels
 
 1. Run SWI-Prolog ($ swipl)
 2. Load latexify package (?- [latexify].)

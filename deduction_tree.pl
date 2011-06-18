@@ -56,7 +56,7 @@ principals(A, []) :-
 
 principals(F, P) :-
     F =.. [Fn | Args],
-    (member(Fn, [says, c, ratified, p]) ->
+    ((Fn = says) ->
         ([A, As] = Args,
         principals(As, Ps),
         P = [A | Ps]);
