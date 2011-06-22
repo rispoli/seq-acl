@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <map>
 #include "message.h"
 #include <sstream>
@@ -9,6 +10,7 @@
 #include <string>
 #include <string.h>
 #include <sys/types.h>
+#include <utility>
 #include <vector>
 using namespace std;
 
@@ -44,19 +46,33 @@ void close_and_cleanup(int sock_fd) {
 #endif
 }
 
-vector< vector<string> * > split(string s) {
+vector<string> * split(string s) {
+	vector<string> *v = new vector<string>;
+	size_t p = 0;
+	for(size_t i = 0; i < s.size(); i++)
+		if(s[i] == ',') { v->push_back(s.substr(p, i - p)); p = i + (i + 1 < s.size() && s[i + 1] == ' ' ? 2 : 1); }
+	v->push_back(s.substr(p, s.size() - p));
+	return v;
+}
+
+vector< vector<string > * > split_multiple(string s) {
 	vector< vector<string> * > outer;
-	vector<string> *inner = NULL;
-	size_t p = 0, sb = 0;
+	size_t p = 0;
 	for(size_t i = 0; i < s.size(); i++) {
-		if(s[i] == '[') { inner = new vector<string>(); p = i + 1; sb++; }
-		else if(s[i] == ']') { inner->push_back(s.substr(p, i - p)); outer.push_back(inner); p = i + 1; sb--; }
-		else if(s[i] == ',' && sb) { inner->push_back(s.substr(p, i - p)); p = i + 1; }
+		if(s[i] == '[') p = i + 1;
+		else if(s[i] == ']') { outer.push_back(split(s.substr(p, i - p))); p = i + 1; }
 	}
 	return outer;
 }
 
-int process_query(string whoami, string iporhostname, string credentials, string query, map<string, string> addresses) {
+string join(vector<string> v) {
+	stringstream ss;
+	for(size_t i = 0; i < v.size(); i++)
+		ss << v[i] << ", ";
+	return ss.str().substr(0, ss.str().size() - 2);
+}
+
+int process_query(string whoami, string iporhostname, string credentials, string query, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
 	int sock_fd = -1;
 	size_t rv;
 	string port("3333");
@@ -178,37 +194,82 @@ int process_query(string whoami, string iporhostname, string credentials, string
 			return FAILURE;
 		}
 
-		string c_sets_of_sets(answer, 1, answer_metadata.size - 2);
-		cout << iporhostname << ":" << port << " says: find these additional credentials '" << c_sets_of_sets << "'." << endl;
-
-		vector< vector<string> * > v = split(c_sets_of_sets);
-
-		int positive_results = 0;
+		vector< vector<string> * > vm = split_multiple(answer);
 		stringstream new_credentials; new_credentials << "(" << credentials << ")";
-		for(size_t i = 0; i < v.size(); i++) {
-			size_t j = 0;
+		size_t i = 0, successes = 0;
+		while(i < vm.size() && i == successes) {
+			vector<string> *v = vm[i];
 			int return_value = FAILURE;
-			while(j < v[i]->size() && return_value != SUCCESS) {
-				size_t p = (*v[i])[j].find("says");
-				if(p != string::npos) {
-					if(addresses.find((*v[i])[j].substr(0, p - 1)) == addresses.end())
-						cerr << "Address for '" << (*v[i])[j].substr(0, p - 1) << "' not found." << endl;
-					else
-						return_value = process_query(whoami, addresses[(*v[i])[j].substr(0, p - 1)], whoami + " says " + (*v[i])[j] , (*v[i])[j] , addresses);
+			if(interactive) {
+				unsigned int choices = 0;
+				do {
+					stringstream choice_banner;
+					choice_banner << iporhostname << ":" << port << " says: choose one among these additional credentials:" << endl;
+					choices = 0;
+					for(size_t j = 0; j < v->size(); j++)
+						if(history.find(make_pair((*v)[j], i)) == history.end() && (*v)[j] != "") {
+							choice_banner << j << ". " << (*v)[j] << endl;
+							choices++;
+						}
+					if(choices) {
+						cout << choice_banner.str();
+						int c = -1;
+						do {
+							cout << "> ";
+							while(!(cin >> c)) {
+								cin.clear();
+								cin.ignore(numeric_limits<streamsize>::max(), '\n');
+								cout << "> ";
+							}
+						} while(c < 0 || c >= (int)v->size() || history.find(make_pair((*v)[c], i)) != history.end());
+						size_t p = (*v)[c].find("says");
+						if(p != string::npos) {
+							if(addresses.find((*v)[c].substr(0, p - 1)) == addresses.end())
+								cerr << "Address for '" << (*v)[c].substr(0, p - 1) << "' not found." << endl;
+							else {
+								history[make_pair((*v)[c], i)] = true;
+								return_value = process_query(whoami, addresses[(*v)[c].substr(0, p - 1)], whoami + " says " + (*v)[c], (*v)[c], addresses, interactive, history);
+							}
+						}
+						if(return_value == SUCCESS) {
+							new_credentials << " and (" << (*v)[c] << ")";
+							successes++;
+						}
+					}
+				} while(return_value != SUCCESS && choices);
+			} else {
+				size_t j = 0;
+				if((*v)[0] != "") {
+					cout << iporhostname << ":" << port << " says: additional credentials '" << join(*v) << "'." << endl;
+					while(j < v->size() && return_value != SUCCESS) {
+						if(history.find(make_pair((*v)[j], i)) == history.end()) {
+							size_t p = (*v)[j].find("says");
+							if(p != string::npos) {
+								if(addresses.find((*v)[j].substr(0, p - 1)) == addresses.end())
+									cerr << "Address for '" << (*v)[j].substr(0, p - 1) << "' not found." << endl;
+								else {
+									history[make_pair((*v)[j], i)] = true;
+									return_value = process_query(whoami, addresses[(*v)[j].substr(0, p - 1)], whoami + " says " + (*v)[j], (*v)[j], addresses, interactive, history);
+								}
+							}
+						}
+						j++;
+					}
 				}
-				j++;
+				if(return_value == SUCCESS) {
+					new_credentials << " and (" << (*v)[j - 1] << ")";
+					successes++;
+				}
 			}
-			if(return_value == SUCCESS) {
-				new_credentials << " and (" << (*v[i])[j - 1] << ")";
-				positive_results++;
-			} else break;
+			i++;
 		}
-
-		if(positive_results == (int)v.size())
-			answer_metadata.status = process_query(whoami, iporhostname + ":" + port, new_credentials.str(), query, addresses);
+		if(vm.size() == successes)
+			answer_metadata.status = process_query(whoami, iporhostname + ":" + port, new_credentials.str(), query, addresses, interactive, history);
+		else
+			cout << iporhostname << ":" << port << " says: '" << query << "' cannot be granted." << endl;
 
 		free(answer);
-		for(size_t i = 0; i < v.size(); i++) delete v[i];
+		for(size_t i = 0; i < vm.size(); i++) delete vm[i];
 	}
 
 	return answer_metadata.status;
@@ -228,7 +289,7 @@ map<string, string> process_addresses(const char *fn) {
 		if((p = line.find(",")) != string::npos) {
 			a[line.substr(0, p)] = line.substr(p + 1, line.size() - p);
 		} else if(line != "") {
-			cerr << "Malformed request file" << endl;
+			cerr << "Malformed addresses file" << endl;
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -254,7 +315,7 @@ string process_credentials(const char *fn) {
 	return credentials;
 }
 
-void process_requests(string whoami, const char *fn, string credentials, map<string, string> addresses) {
+void process_requests(string whoami, const char *fn, string credentials, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
 	ifstream f(fn);
 	if(!f.is_open()) {
 		cerr << "Could not open request file" << endl;
@@ -265,7 +326,7 @@ void process_requests(string whoami, const char *fn, string credentials, map<str
 	while(f.good()) {
 		getline(f, line);
 		if((p = line.find("@")) != string::npos) {
-			process_query(whoami, line.substr(line.find_first_not_of(" \t", p + 1), line.find_last_not_of(" \t") - line.find_first_not_of(" \t", p + 1) + 1), credentials, line.substr(0, p), addresses);
+			process_query(whoami, line.substr(line.find_first_not_of(" \t", p + 1), line.find_last_not_of(" \t") - line.find_first_not_of(" \t", p + 1) + 1), credentials, line.substr(0, p), addresses, interactive, history);
 		} else if(line != "") {
 			cerr << "Malformed request file" << endl;
 			exit(EXIT_FAILURE);
@@ -280,8 +341,9 @@ int main(int argc, char *argv[]) {
 	struct arg_file *credentials = arg_file0("c", "credentials", NULL, "credentials path (default: credentials)");
 	struct arg_file *request = arg_file0("r", "request", NULL, "request path (default: request)");
 	struct arg_file *addresses = arg_file0("a", "addresses", NULL, "addresses path (default: addresses)");
+	struct arg_lit *interactive = arg_lit0("i", "interactive", "interactively choose which additional credential to request");
 	struct arg_end *end = arg_end(23);
-	void *argtable[] = {help, whoami, credentials, request, addresses, end};
+	void *argtable[] = {help, whoami, credentials, request, addresses, interactive, end};
 
 	if(arg_nullcheck(argtable) != 0) {
 		cerr << "Could not allocate enough memory for command line arguments" << endl;
@@ -309,10 +371,11 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	map<pair<string, size_t>, bool> history;
 	if(credentials->count > 0)
-		process_requests(whoami->sval[0], request->filename[0], process_credentials(credentials->filename[0]), process_addresses(addresses->filename[0]));
+		process_requests(whoami->sval[0], request->filename[0], process_credentials(credentials->filename[0]), process_addresses(addresses->filename[0]), interactive->count > 0, history);
 	else
-		process_requests(whoami->sval[0], request->filename[0], "", process_addresses(addresses->filename[0]));
+		process_requests(whoami->sval[0], request->filename[0], "", process_addresses(addresses->filename[0]), interactive->count > 0, history);
 
 	arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
 

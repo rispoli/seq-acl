@@ -7,7 +7,8 @@ empty([ _ ]) :- !, fail.
 
 print_leaves(([(_, M, _, Δ), []], '')) :-
     formulae(M, Δ, XE),
-    exclude(empty, XE, X),
+    exclude(empty, XE, XF),
+    flatten(XF, X),
     write(X).
 
 print_leaves(([_, Premises], _)) :-

@@ -158,12 +158,11 @@ cout << command.str() << endl;
 
 	struct answer_t answer;
 
-	string result;
+	string result = c_output.str();
 	if(WEXITSTATUS(exit_status)) {
-		result = c_output.str();
 		answer.status = FAILURE;
+		answer.size = result.size();
 	} else {
-		result = c_output.str();
 		if(result == "granted") {
 			answer.status = SUCCESS;
 			answer.size = 0;
