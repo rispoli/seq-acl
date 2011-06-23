@@ -72,6 +72,16 @@ string join(vector<string> v) {
 	return ss.str().substr(0, ss.str().size() - 2);
 }
 
+bool already_granted(vector<string> v, size_t b, map<pair<string, size_t>, bool> h) {
+	for(size_t i = 0; i < v.size(); i++)
+		for(size_t j = 0; j < b; j++) {
+			map<pair<string, size_t>, bool>::iterator it = h.find(make_pair(v[i], j));
+			if(it != h.end() && it->second)
+				return true;
+		}
+	return false;
+}
+
 int process_query(string whoami, string iporhostname, string credentials, string query, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
 	int sock_fd = -1;
 	size_t rv;
@@ -199,68 +209,72 @@ int process_query(string whoami, string iporhostname, string credentials, string
 		size_t i = 0, successes = 0;
 		while(i < vm.size() && i == successes) {
 			vector<string> *v = vm[i];
-			int return_value = FAILURE;
-			if(interactive) {
-				unsigned int choices = 0;
-				do {
-					stringstream choice_banner;
-					choice_banner << iporhostname << ":" << port << " says: choose one among these additional credentials:" << endl;
-					choices = 0;
-					for(size_t j = 0; j < v->size(); j++)
-						if(history.find(make_pair((*v)[j], i)) == history.end() && (*v)[j] != "") {
-							choice_banner << j << ". " << (*v)[j] << endl;
-							choices++;
-						}
-					if(choices) {
-						cout << choice_banner.str();
-						int c = -1;
-						do {
-							cout << "> ";
-							while(!(cin >> c)) {
-								cin.clear();
-								cin.ignore(numeric_limits<streamsize>::max(), '\n');
+			if(!already_granted(*v, i, history)) {
+				int return_value = FAILURE;
+				if(interactive) {
+					unsigned int choices = 0;
+					do {
+						stringstream choice_banner;
+						choice_banner << iporhostname << ":" << port << " says: choose one among these additional credentials:" << endl;
+						choices = 0;
+						for(size_t j = 0; j < v->size(); j++)
+							if(history.find(make_pair((*v)[j], i)) == history.end() && (*v)[j] != "") {
+								choice_banner << j << ". " << (*v)[j] << endl;
+								choices++;
+							}
+						if(choices) {
+							cout << choice_banner.str();
+							int c = -1;
+							do {
 								cout << "> ";
-							}
-						} while(c < 0 || c >= (int)v->size() || history.find(make_pair((*v)[c], i)) != history.end());
-						size_t p = (*v)[c].find("says");
-						if(p != string::npos) {
-							if(addresses.find((*v)[c].substr(0, p - 1)) == addresses.end())
-								cerr << "Address for '" << (*v)[c].substr(0, p - 1) << "' not found." << endl;
-							else {
-								history[make_pair((*v)[c], i)] = true;
-								return_value = process_query(whoami, addresses[(*v)[c].substr(0, p - 1)], whoami + " says " + (*v)[c], (*v)[c], addresses, interactive, history);
-							}
-						}
-						if(return_value == SUCCESS) {
-							new_credentials << " and (" << (*v)[c] << ")";
-							successes++;
-						}
-					}
-				} while(return_value != SUCCESS && choices);
-			} else {
-				size_t j = 0;
-				if((*v)[0] != "") {
-					cout << iporhostname << ":" << port << " says: additional credentials '" << join(*v) << "'." << endl;
-					while(j < v->size() && return_value != SUCCESS) {
-						if(history.find(make_pair((*v)[j], i)) == history.end()) {
-							size_t p = (*v)[j].find("says");
+								while(!(cin >> c)) {
+									cin.clear();
+									cin.ignore(numeric_limits<streamsize>::max(), '\n');
+									cout << "> ";
+								}
+							} while(c < 0 || c >= (int)v->size() || history.find(make_pair((*v)[c], i)) != history.end());
+							size_t p = (*v)[c].find("says");
 							if(p != string::npos) {
-								if(addresses.find((*v)[j].substr(0, p - 1)) == addresses.end())
-									cerr << "Address for '" << (*v)[j].substr(0, p - 1) << "' not found." << endl;
+								if(addresses.find((*v)[c].substr(0, p - 1)) == addresses.end())
+									cerr << "Address for '" << (*v)[c].substr(0, p - 1) << "' not found." << endl;
 								else {
-									history[make_pair((*v)[j], i)] = true;
-									return_value = process_query(whoami, addresses[(*v)[j].substr(0, p - 1)], whoami + " says " + (*v)[j], (*v)[j], addresses, interactive, history);
+									history[make_pair((*v)[c], i)] = false;
+									return_value = process_query(whoami, addresses[(*v)[c].substr(0, p - 1)], whoami + " says " + (*v)[c], (*v)[c], addresses, interactive, history);
+									history[make_pair((*v)[c], i)] = return_value == SUCCESS;
 								}
 							}
+							if(return_value == SUCCESS) {
+								new_credentials << " and (" << (*v)[c] << ")";
+								successes++;
+							}
 						}
-						j++;
+					} while(return_value != SUCCESS && choices);
+				} else {
+					size_t j = 0;
+					if((*v)[0] != "") {
+						cout << iporhostname << ":" << port << " says: additional credentials '" << join(*v) << "'." << endl;
+						while(j < v->size() && return_value != SUCCESS) {
+							if(history.find(make_pair((*v)[j], i)) == history.end()) {
+								size_t p = (*v)[j].find("says");
+								if(p != string::npos) {
+									if(addresses.find((*v)[j].substr(0, p - 1)) == addresses.end())
+										cerr << "Address for '" << (*v)[j].substr(0, p - 1) << "' not found." << endl;
+									else {
+										history[make_pair((*v)[j], i)] = false;
+										return_value = process_query(whoami, addresses[(*v)[j].substr(0, p - 1)], whoami + " says " + (*v)[j], (*v)[j], addresses, interactive, history);
+										history[make_pair((*v)[j], i)] = return_value == SUCCESS;
+									}
+								}
+							}
+							j++;
+						}
+					}
+					if(return_value == SUCCESS) {
+						new_credentials << " and (" << (*v)[j - 1] << ")";
+						successes++;
 					}
 				}
-				if(return_value == SUCCESS) {
-					new_credentials << " and (" << (*v)[j - 1] << ")";
-					successes++;
-				}
-			}
+			} else successes++;
 			i++;
 		}
 		if(vm.size() == successes)
