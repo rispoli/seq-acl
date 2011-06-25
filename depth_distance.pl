@@ -11,8 +11,8 @@ distance([], _, _, _) :-
     !, fail.
 
 distance(L, U, X, 0) :-
-    member(U <= X, L);
-    member(s(U, _, X), L).
+    memberchk(U <= X, L);
+    memberchk(s(U, _, X), L).
 
 distance(L, U, X, D) :-
     (

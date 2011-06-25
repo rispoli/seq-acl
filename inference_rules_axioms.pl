@@ -22,7 +22,7 @@ inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [s(X, A, W) | M], Γ, Δ)], '\\mbox{mo
     member(X <= Y, M),
     member(s(Y, A, Z), M),
     member(Z <= W, M),
-    \+member(s(X, A, W), M).
+    \+memberchk(s(X, A, W), M).
 
 % ∧: right
 inference_rule_r(X : Alpha and Beta, (Σ, M, Γ, Δ), _, [(Σ, M, Γ, [X : Alpha | Δ]), (Σ, M, Γ, [X : Beta | Δ])], '\\land\\mbox{R}').
