@@ -12,10 +12,10 @@ axiom(M, Γ, Δ, '\\mbox{init}') :-
     atom(P).
 
 axiom(_, _, Δ, '\\top\\mbox{R}') :-
-    member(_ : '\\top', Δ).
+    memberchk(_ : '\\top', Δ).
 
 axiom(_, Γ, _, '\\bot\\mbox{L}') :-
-    member(_ : '\\bot', Γ).
+    memberchk(_ : '\\bot', Γ).
 
 % mon-S
 inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [s(X, A, W) | M], Γ, Δ)], '\\mbox{mon-S}') :-
@@ -53,33 +53,33 @@ inference_rule_l(X : Alpha or Beta, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [X : A
 % →: left
 inference_rule_l(X : Alpha -> Beta, (Σ, M, Γ, Δ), Used, [(X : Alpha -> Beta, Y) | Used], [(Σ, M, [Y : Beta | Γ], Δ), (Σ, M, Γ, [Y : Alpha | Δ])], '\\rightarrow\\mbox{L}') :-
     member(X <= Y, M),
-    \+member(Y : Alpha, Δ),
-    \+member(Y : Beta, Γ),
-    \+member((X : Alpha -> Beta, Y), Used).
+    \+memberchk(Y : Alpha, Δ),
+    \+memberchk(Y : Beta, Γ),
+    \+memberchk((X : Alpha -> Beta, Y), Used).
 
 % says: left
 inference_rule_l(X : A says Alpha, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [Y : Alpha | Γ], Δ)], '\\mbox{\\textsf{says} L}') :-
     member(s(X, A, Y), M),
-    \+member(Y : Alpha, Γ).
+    \+memberchk(Y : Alpha, Γ).
 
 % Refl
 inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [X <= X | M], Γ, Δ)], '\\mbox{Refl}') :-
     member(X, Σ),
-    \+member(X <= X, M).
+    \+memberchk(X <= X, M).
 
 % Trans
 inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [X <= Z | M], Γ, Δ)], '\\mbox{Trans}') :-
     member(X <= Y, M),
     member(Y <= Z, M),
-    \+member(X <= Z, M).
+    \+memberchk(X <= Z, M).
 
 % s-I-SS
 inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [s(X, A, Z) | M], Γ, Δ)], '\\mbox{s-I-SS}') :-
     member(s(X, _, Y), M),
     member(s(Y, A, Z), M),
-    \+member(s(X, A, Z), M).
+    \+memberchk(s(X, A, Z), M).
 
 % C
 inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [s(Y, A, Y) | M], Γ, Δ)], '\\mbox{s-C}') :-
     member(s(_, A, Y), M),
-    \+member(s(Y, A, Y), M).
+    \+memberchk(s(Y, A, Y), M).

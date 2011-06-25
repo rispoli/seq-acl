@@ -23,11 +23,10 @@ inner_join([Head | Tail], Separator, TempString, Output) :-
 functor2string(and, ' \\land ').
 functor2string(or, ' \\lor ').
 functor2string(says, ' \\mbox{ \\textsf{says} } ').
-functor2string(ratified, ' \\mbox{ \\textsf{ratified} } ').
-functor2string(=>, ' => ').
 functor2string(->, ' \\rightarrow ').
 functor2string(:, ' : ').
 functor2string(<=, ' \\leq ').
+functor2string(s, 'S').
 
 parentheses(Parent_functor, Functor) :-
     op_pri(X, Parent_functor),
