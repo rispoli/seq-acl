@@ -6,7 +6,7 @@ empty([]).
 empty([ _ ]) :- !, fail.
 
 print_leaves(([(_, M, _, Δ), []], '')) :-
-    formulae(M, Δ, XE),
+    !, formulae(M, Δ, XE),
     exclude(empty, XE, XF),
     flatten(XF, X),
     write(X).
