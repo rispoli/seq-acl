@@ -1,5 +1,6 @@
 :- [inference_rules_axioms].
 :- [depth_distance].
+:- dynamic(non_provable/0).
 
 expand_premises([], _, _, _, []).
 
