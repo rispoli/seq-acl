@@ -1,2 +1,2 @@
-a says df1 -> df1
-a says trusted_b -> a says (b says df1 -> df1)
+policy(a controls df1).
+policy(a says trusted_b -> a trusts b on df1).

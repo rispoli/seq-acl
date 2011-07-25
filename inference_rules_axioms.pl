@@ -1,6 +1,6 @@
-:- op(500, yfx, and),
+:- op(450, xfy, says),
+   op(500, yfx, and),
    op(600, yfx, or),
-   op(650, xfy, says),
    op(700, xfy, ->),
    op(800, xfx, :),
    op(700, xfx, <=).
@@ -8,8 +8,7 @@
 axiom(M, Γ, Δ, '\\mbox{init}') :-
     member(X <= Y, M),
     member(X : P, Γ),
-    member(Y : P, Δ),
-    atom(P).
+    member(Y : P, Δ).
 
 axiom(_, _, Δ, '\\top\\mbox{R}') :-
     memberchk(_ : '\\top', Δ).
@@ -24,20 +23,36 @@ inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [s(X, A, W) | M], Γ, Δ)], '\\mbox{mo
     member(Z <= W, M),
     \+memberchk(s(X, A, W), M).
 
+open_leaves(([_, []], '')) :- !.
+
+open_leaves(([_, P], _)) :-
+    maplist(open_leaves, P).
+
+open_leaves(([_, PL], _) or ([_, PR], _)) :-
+    (maplist(open_leaves, PL), !);
+    maplist(open_leaves, PR).
+
 % ∧: right
-inference_rule_r(X : Alpha and Beta, (Σ, M, Γ, Δ), _, [(Σ, M, Γ, [X : Alpha | Δ]), (Σ, M, Γ, [X : Beta | Δ])], '\\land\\mbox{R}').
+inference_rule_r(X : Alpha and Beta, (Σ, M, Γ, Δ), _, _, _, [(Σ, M, Γ, [X : Alpha | Δ]), (Σ, M, Γ, [X : Beta | Δ])], '\\land\\mbox{R}').
 
 % ∨: right
-inference_rule_r(X: Alpha or Beta, (Σ, M, Γ, Δ), _, [(Σ, M, Γ, [X : Alpha, X : Beta | Δ])], '\\lor\\mbox{R}').
+inference_rule_r(X: Alpha or Beta, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises, '\\lor\\mbox{R}') :-
+    search_nodes((Σ, M, Γ, [X : Alpha | Δ]), Depth, Principals, Used, TL),
+    (open_leaves(TL) ->
+        (search_nodes((Σ, M, Γ, [X : Beta | Δ]), Depth, Principals, Used, TR),
+        (open_leaves(TR) ->
+            Premises = [TL or TR];
+            (retract(non_provable), Premises = [TR])));
+        Premises = [TL]).
 
 % →: right
-inference_rule_r(X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, [([Y | Σ], [X <= Y | M], [Y : Alpha | Γ], [Y : Beta | Δ])], '\\rightarrow\\mbox{R}') :-
+inference_rule_r(X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, _, _, [([Y | Σ], [X <= Y | M], [Y : Alpha | Γ], [Y : Beta | Δ])], '\\rightarrow\\mbox{R}') :-
     gensym(y_, Y),
     max_distance(M, u, X, Distance),
     Distance =< Depth.
 
 % says: right
-inference_rule_r(X : A says Alpha, (Σ, M, Γ, Δ), Depth, [([Y | Σ], [s(X, A, Y) | M], Γ, [Y : Alpha | Δ])], '\\mbox{\\textsf{says} R}') :-
+inference_rule_r(X : A says Alpha, (Σ, M, Γ, Δ), Depth, _, _, [([Y | Σ], [s(X, A, Y) | M], Γ, [Y : Alpha | Δ])], '\\mbox{\\textsf{says} R}') :-
     gensym(y_, Y),
     max_distance(M, u, X, Distance),
     Distance =< Depth.

@@ -1,4 +1,5 @@
 struct c2s_t {
+	size_t principal_size;
 	size_t credentials_size;
 	size_t request_size;
 };

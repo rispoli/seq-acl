@@ -93,6 +93,14 @@ int handle_query(string executable_path, string options, int sock_fd, string pol
 		return 1;
 	}
 
+	char *principal = (char *)malloc(query_metadata.principal_size + 1);
+	memset(principal, 0, query_metadata.principal_size + 1);
+	if(recv(sock_fd, (RCAST *)principal, query_metadata.principal_size, 0) == -1) {
+		cerr << "Could not receive data (" << errno << ")" << endl;
+		closesocket(sock_fd);
+		free(principal);
+		return 1;
+	}
 	char *credentials = NULL;
 	if(query_metadata.credentials_size > 0) {
 		credentials = (char *)malloc(query_metadata.credentials_size + 1);
@@ -114,29 +122,11 @@ int handle_query(string executable_path, string options, int sock_fd, string pol
 		return 1;
 	}
 
-	ifstream policy_f(policy_fn.c_str());
-	if(!policy_f.is_open()) {
-		cerr << "Could not open policy file" << endl;
-		closesocket(sock_fd);
-		free(query);
-		if(credentials != NULL) free(credentials);
-		return 1;
-	}
-	string line, policy = "";
-	while(policy_f.good()) {
-		getline(policy_f, line);
-		if(line != "")
-			policy += "(" + line + ") and ";
-		else
-			policy.erase(policy.size() - 5, 5);
-	}
-	policy_f.close();
-
 	stringstream command;
 	if(credentials != NULL)
-		command << executable_path << options << " 'prove_c(" << policy << ", " << string(credentials) << ", " << string(query) << ")' 2>&1";
+		command << executable_path << options << " 'prove_c(" << policy_fn << ", " << string(principal) << ", " << string(credentials) << ", " << string(query) << ")' 2>&1";
 	else
-		command << executable_path << options << " 'prove_c(" << policy << ", " << string(query) << ")' 2>&1";
+		command << executable_path << options << " 'prove_c(" << policy_fn << ", " << string(principal) << ", " << string(query) << ")' 2>&1";
 cout << command.str() << endl;
 
 	FILE *fpipe;

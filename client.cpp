@@ -148,6 +148,7 @@ int process_query(string whoami, string iporhostname, string credentials, string
 	freeaddrinfo(serv_info);
 
 	c2s_t query_metadata;
+	query_metadata.principal_size = whoami.size();
 	query_metadata.credentials_size = credentials.size();
 	query_metadata.request_size = query.size();
 
@@ -157,6 +158,11 @@ int process_query(string whoami, string iporhostname, string credentials, string
 		return FAILURE;
 	}
 
+	if(send(sock_fd, (SCAST *)whoami.c_str(), whoami.size(), 0) == -1) {
+		cerr << "Could not send principal (" << errno << ")" << endl;
+		close_and_cleanup(sock_fd);
+		return FAILURE;
+	}
 	if(credentials != "")
 		if(send(sock_fd, (SCAST *)credentials.c_str(), credentials.size(), 0) == -1) {
 			cerr << "Could not send credentials (" << errno << ")" << endl;

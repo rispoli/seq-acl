@@ -25,8 +25,10 @@ expand_l(F, Depth, Principals, Used, T) :-
 
 expand_r((Σ, M, Γ, Δ), Depth, Principals, Used, ([(Σ, M, Γ, Δ), Premises_tree], Rule)) :-
     select(X, Δ, Δ_minus_X),
-    inference_rule_r(X, (Σ, M, Γ, Δ_minus_X), Depth, Premises, Rule), !,
-    expand_premises(Premises, Depth, Principals, Used, Premises_tree).
+    inference_rule_r(X, (Σ, M, Γ, Δ_minus_X), Depth, Principals, Used, Premises, Rule), !,
+    ((Rule = '\\lor\\mbox{R}') ->
+        Premises_tree = Premises;
+        expand_premises(Premises, Depth, Principals, Used, Premises_tree)).
 
 expand_r(F, Depth, Principals, Used, T) :-
     expand_l(F, Depth, Principals, Used, T).
