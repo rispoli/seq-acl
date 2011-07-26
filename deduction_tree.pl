@@ -24,8 +24,7 @@ expand_l(F, Depth, Principals, Used, T) :-
     expand(F, Depth, Principals, Used, T).
 
 expand_r((Σ, M, Γ, Δ), Depth, Principals, Used, ([(Σ, M, Γ, Δ), Premises_tree], Rule)) :-
-    select(X, Δ, Δ_minus_X),
-    inference_rule_r(X, (Σ, M, Γ, Δ_minus_X), Depth, Principals, Used, Premises, Rule), !,
+    inference_rule_r(Δ, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises, Rule), !,
     ((Rule = '\\lor\\mbox{R}') ->
         Premises_tree = Premises;
         expand_premises(Premises, Depth, Principals, Used, Premises_tree)).
@@ -69,7 +68,7 @@ prove(F, T) :-
     depth(F, D),
     principals(F, P_l), list_to_set(P_l, P),
     retractall(non_provable), reset_gensym,
-    search_nodes(([u], [], [], [u : F]), D, P, [], T).
+    search_nodes(([u], [], [], u : F), D, P, [], T).
 
 prove(F) :-
     prove(F, _), \+non_provable.
