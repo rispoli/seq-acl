@@ -133,7 +133,7 @@ get_abducibles([], success, []) :- !.
 get_abducibles(AG1Gn, failure, AG1Gn_) :-
     (length(AG1Gn, 1) ->
         nth0(0, AG1Gn, AG1Gn_);
-        AG1Gn_ = AG1Gn).
+        (maplist(nth0(0), AG1Gn, AG1Gn__), AG1Gn_ = [AG1Gn__])).
 
 nd_choice([], _, _, _, Status, Status, []).
 
