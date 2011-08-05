@@ -23,6 +23,8 @@ inference_rule_sem((Σ, M, Γ, Δ), [(Σ, [s(X, A, W) | M], Γ, Δ)], '\\mbox{mo
 
 open_leaves(([_, []], '')) :- !.
 
+open_leaves(([_, []], _)) :- !, fail.
+
 open_leaves(([_, P], _)) :-
     maplist(open_leaves, P).
 
@@ -63,16 +65,53 @@ inference_rule_l(X : Alpha and Beta, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [X : 
 inference_rule_l(X : Alpha or Beta, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [X : Alpha | Γ_], Δ), (Σ, M, [X : Beta | Γ_], Δ)], '\\lor\\mbox{L}') :-
     delete(Γ, X : Alpha or Beta, Γ_).
 
-% →: left
-inference_rule_l(X : Alpha -> Beta, (Σ, M, Γ, Δ), Used, [(X : Alpha -> Beta, Y) | Used], [(Σ, M, [Y : Beta | Γ], Δ), (Σ, M, Γ, Y : Alpha)], '\\rightarrow\\mbox{L}') :-
-    member(X <= Y, M),
-    \+memberchk(Y : Beta, Γ),
-    \+memberchk((X : Alpha -> Beta, Y), Used).
-
 % says: left
 inference_rule_l(X : A says Alpha, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [Y : Alpha | Γ], Δ)], '\\mbox{\\textsf{says} L}') :-
     member(s(X, A, Y), M),
     \+memberchk(Y : Alpha, Γ).
+
+la(_ : _ -> _).
+
+% →: left
+inference_rule_la((Σ, M, Γ, Δ), Depth, Principals, Used, Premises, '\\rightarrow\\mbox{L}') :- % [Premises]
+    include(la, Γ, Γ_la),
+    la_f(Γ_la, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises_LA),
+    (is_list(Premises_LA) -> Premises = Premises_LA; Premises = [Premises_LA]).
+
+lal(X, X <= _).
+
+la_f([X : Alpha -> Beta], (Σ, M, Γ, Δ), Depth, Principals, Used, Premises) :-
+    !, include(lal(X), M, M_lal),
+    la_l(M_lal, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises).
+
+la_f([X : Alpha -> Beta | T], (Σ, M, Γ, Δ), Depth, Principals, Used, Premises) :-
+    include(lal(X), M, M_lal),
+    la_l(M_lal, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises_H),
+    (is_list(Premises_H) ->
+        Premises = Premises_H;
+        (retract(non_provable), !, la_f(T, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises_T), (is_list(Premises_T) -> Premises = Premises_T; Premises = Premises_H or Premises_T))).
+
+la_l([X <= Y], X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises) :-
+    !, \+memberchk(Y : Beta, Γ),
+    \+memberchk((X : Alpha -> Beta, Y), Used),
+    search_nodes((Σ, M, Γ, Y : Alpha), Depth, Principals, [(X : Alpha -> Beta, Y) | Used], TA),
+    (open_leaves(TA) ->
+        Premises = TA;
+        (search_nodes((Σ, M, [Y : Beta | Γ], Δ), Depth, Principals, [(X : Alpha -> Beta, Y) | Used], TB),
+        (open_leaves(TB) ->
+            Premises = TB;
+            Premises = [TA, TB]))).
+
+la_l([X <= Y | T], X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises) :-
+    \+memberchk(Y : Beta, Γ),
+    \+memberchk((X : Alpha -> Beta, Y), Used),
+    search_nodes((Σ, M, Γ, Y : Alpha), Depth, Principals, [(X : Alpha -> Beta, Y) | Used], TA),
+    (open_leaves(TA) ->
+        (retract(non_provable), !, la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises_T), (is_list(Premises_T) -> Premises = Premises_T; Premises = TA or Premises_T));
+        (search_nodes((Σ, M, [Y : Beta | Γ], Δ), Depth, Principals, [(X : Alpha -> Beta, Y) | Used], TB),
+        (open_leaves(TB) ->
+            (retract(non_provable), !, la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Principals, Used, Premises_T), (is_list(Premises_T) -> Premises = Premises_T; Premises = TB or Premises_T));
+            Premises = [TA, TB]))).
 
 % Refl
 inference_rule((Σ, M, Γ, Δ), _, _, Used, Used, [(Σ, [X <= X | M], Γ, Δ)], '\\mbox{Refl}') :-

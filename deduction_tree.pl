@@ -8,12 +8,18 @@ expand_premises([H | T], Depth, Principals, Used, [T1 | T2]) :-
     search_nodes(H, Depth, Principals, Used, T1),
     expand_premises(T, Depth, Principals, Used, T2).
 
+expand_la(F, Depth, Principals, Used, ([F, Premises], Rule)) :-
+    inference_rule_la(F, Depth, Principals, Used, Premises, Rule), !.
+
+expand_la(F, _, _, _, ([F, []], '')) :-
+    assert(non_provable), !.
+
 expand(F, Depth, Principals, Used, ([F, Premises_tree], Rule)) :-
     inference_rule(F, Depth, Principals, Used, Used_, Premises, Rule), !,
     expand_premises(Premises, Depth, Principals, Used_, Premises_tree).
 
-expand(F, _, _, _, ([F, []], '')) :-
-    assert(non_provable), !.
+expand(F, Depth, Principals, Used, T) :-
+    expand_la(F, Depth, Principals, Used, T).
 
 expand_l((Σ, M, Γ, Δ), Depth, Principals, Used, ([(Σ, M, Γ, Δ), Premises_tree], Rule)) :-
     member(X, Γ),

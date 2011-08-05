@@ -30,10 +30,6 @@ pretty_print(L, PL) :-
 pretty_print(X, PX) :-
     format(atom(PX), '~w', X).
 
-empty([]).
-
-empty([ _ ]) :- !, fail.
-
 empty_closed_premise(([_, []], Label)) :-
     Label \= ''.
 
@@ -44,7 +40,7 @@ get_result(In, Out) :-
 
 print_leaves(([(_, M, _, Δ), []], ''), X) :-
     !, formulae(M, Δ, XE),
-    exclude(empty, XE, XO),
+    subtract(XE, [[]], XO),
     get_result(XO, X).
 
 print_leaves(([_, L_Premises], _) or ([_, R_Premises], _), L_Leaves or R_Leaves) :-
@@ -59,12 +55,12 @@ prove_c(Policy_F, Principal, Request) :-
     smart_grounder(Policy_F, Principal, Request, Policy),
     prove((Policy) -> (Request), T),
     (non_provable ->
-        (print_leaves(T, L), pretty_print(L, PL), write(PL));
+        (print_leaves(T, L), ((L = []) -> PL = []; pretty_print(L, PL)), write(PL));
         write(granted)).
 
 prove_c(Policy_F, Principal, Credentials, Request) :-
     smart_grounder(Policy_F, Principal, Request, Policy),
     prove(((Policy) and (Credentials)) -> (Request), T),
     (non_provable ->
-        (print_leaves(T, L), pretty_print(L, PL), write(PL));
+        (print_leaves(T, L), ((L = []) -> PL = []; pretty_print(L, PL)), write(PL));
         write(granted)).
