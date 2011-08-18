@@ -36,41 +36,41 @@ r_sequents(X : N -> G, (Σ, M, Γ, Ξ), Depth, Used, Abducibles) :-
     gensym(y_, Y),
     max_distance(M, u, X, Distance),
     Distance =< Depth,
-    !, r_sequents(Y : G, ([Y | Σ], [X <= Y | M], Γ, [Y : N | Ξ]), Depth, Used, Abducibles).
+    !, expand_l_sequents(([Y | Σ], [X <= Y | M], Γ, [Y : N | Ξ], Y : G), Depth, Used, Abducibles).
 
 % atom
-r_sequents(X : P, (Σ, M, Γ, Ξ), Depth, Used, Abducibles) :-
-    expand_l_sequents((Σ, M, Γ, Ξ, X : P), Depth, Used, Abducibles).
+r_sequents(X : P, (Σ, M, Γ, []), Depth, Used, Abducibles) :-
+    !, expand_sat_sequents(Σ, M, Σ_S, M_S),
+    n_sequents((Σ_S, M_S, Γ, X : P), Depth, Used, Abducibles).
 
 % ⊤ L
-l_sequents(_ : top, (Σ, M, Γ, Ξ, WP), (Σ, M, Γ, Ξ, WP)).
+l_sequents(_ : top, (Σ, M, Γ, Ξ, WG), (Σ, M, Γ, Ξ, WG)).
 
 % ⊥ L
 l_sequents(_ : bot, _, _) :- fail.
 
 % ∧ L
-l_sequents(X : N1 and N2, (Σ, M, Γ, Ξ, WP), (Σ, M, Γ, [X : N1, X : N2 | Ξ], WP)).
+l_sequents(X : N1 and N2, (Σ, M, Γ, Ξ, WG), (Σ, M, Γ, [X : N1, X : N2 | Ξ], WG)).
 
 % ∨: left
-l_sequents(X : N1 or N2, (Σ, M, Γ, Ξ, WP), [(Σ, M, Γ, [X : N1 | Ξ], WP), (Σ, M, Γ, [X : N2 | Ξ], WP)]).
+l_sequents(X : N1 or N2, (Σ, M, Γ, Ξ, WG), [(Σ, M, Γ, [X : N1 | Ξ], WG), (Σ, M, Γ, [X : N2 | Ξ], WG)]).
 
 % pr
-l_sequents(X : D, (Σ, M, Γ, Ξ, WP), (Σ, M, [X : D | Γ], Ξ, WP)) :-
+l_sequents(X : D, (Σ, M, Γ, Ξ, WG), (Σ, M, [X : D | Γ], Ξ, WG)) :-
     D \= bot.
 
-% L2N
-expand_l_sequents((Σ, M, Γ, [], WP), Depth, Used, Abducibles) :-
-    !, expand_sat_sequents(Σ, M, Σ_S, M_S),
-    n_sequents((Σ_S, M_S, Γ, WP), Depth, Used, Abducibles).
+% L2R
+expand_l_sequents((Σ, M, Γ, [], WG), Depth, Used, Abducibles) :-
+    !, r_sequents(WG, (Σ, M, Γ, []), Depth, Used, Abducibles).
 
-expand_l_sequents((Σ, M, Γ, Ξ, WP), Depth, Used, Abducibles) :-
+expand_l_sequents((Σ, M, Γ, Ξ, WG), Depth, Used, Abducibles) :-
     select(X, Ξ, Ξ_X),
-    l_sequents(X, (Σ, M, Γ, Ξ_X, WP), Result), !,
+    l_sequents(X, (Σ, M, Γ, Ξ_X, WG), Result), !,
     (is_list(Result) ->
         ([L, R] = Result, expand_l_sequents(L, Depth, Used, Abducibles_L), expand_l_sequents(R, Depth, Used, Abducibles_R), append(Abducibles_L, Abducibles_R, Abducibles));
         expand_l_sequents(Result, Depth, Used, Abducibles)).
 
-expand_l_sequents((Σ, M, Γ, Ξ, WP), _, _, (Σ, M, Γ_, WP)) :-
+expand_l_sequents((Σ, M, Γ, Ξ, WG), _, _, (Σ, M, Γ_, WG)) :-
     append(Γ, Ξ, Γ_).
 
 % s-mon
