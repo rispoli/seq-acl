@@ -5,8 +5,51 @@
    op(800, xfx, :),
    op(700, xfx, <=).
 
+in(H1, H2, H) :-
+    is_list(H1),
+    \+is_list(H2), !,
+    in_(H1, [H2], H).
+
+in(H1, H2, H) :-
+    \+is_list(H1),
+    is_list(H2), !,
+    in_([H1], H2, H).
+
+in(H1, H2, H) :-
+    in_(H1, H2, H).
+
+in_([], _, []) :- !.
+
+in_([HH1 | TH1], H2, [HH | TH]) :-
+    !, in__(H2, HH1, HH),
+    in_(TH1, H2, TH).
+
+in_(H1, H2, H) :-
+    in___(H1, H2, H).
+
+in__([], _, []).
+
+in__([HH2 | TH2], H1, [HH | TH]) :-
+    in___(H1, HH2, HH),
+    in__(TH2, H1, TH).
+
+in___(empty, _, empty).
+
+in___(_, empty, empty).
+
+in___((Σ1, M1, Γ1, Δ1), (Σ2, M2, Γ2, Δ2), (Σ, M, Γ, [Δ1, Δ2])) :-
+    union(Σ1, Σ2, Σ),
+    union(M1, M2, M),
+    union(Γ1, Γ2, Γ).
+
+un(empty, H, [H]) :- !.
+
+un(H, empty, [H]) :- !.
+
+un(H1, H2, [H1, H2]).
+
 % ⊤ R
-r_sequents(_ : top, _, _, _, []) :- !.
+r_sequents(_ : top, _, _, _, empty) :- !.
 
 % says R
 r_sequents(X : A says G, (Σ, M, Γ, Ξ), Depth, Used, Abducibles) :-
@@ -19,17 +62,17 @@ r_sequents(X : A says G, (Σ, M, Γ, Ξ), Depth, Used, Abducibles) :-
 r_sequents(X : G1 and G2, (Σ, M, Γ, Ξ), Depth, Used, Abducibles) :-
     !, r_sequents(X : G1, (Σ, M, Γ, Ξ), Depth, Used, Abducibles_G1),
     r_sequents(X : G2, (Σ, M, Γ, Ξ), Depth, Used, Abducibles_G2),
-    append(Abducibles_G1, Abducibles_G2, Abducibles).
+    un(Abducibles_G1, Abducibles_G2, Abducibles).
 
 % ∨ R
 r_sequents(X : G1 or G2, (Σ, M, Γ, Ξ), Depth, Used, Abducibles) :-
     !, r_sequents(X : G1, (Σ, M, Γ, Ξ), Depth, Used, Abducibles_G1),
-    ((Abducibles_G1 = []) ->
-        Abducibles = [];
+    ((Abducibles_G1 = empty) ->
+        Abducibles = empty;
         (r_sequents(X : G2, (Σ, M, Γ, Ξ), Depth, Used, Abducibles_G2),
-        ((Abducibles_G2 = []) ->
-            Abducibles = [];
-            append(Abducibles_G1, Abducibles_G2, Abducibles)))).
+        ((Abducibles_G2 = empty) ->
+            Abducibles = empty;
+            in(Abducibles_G1, Abducibles_G2, Abducibles)))).
 
 % → R
 r_sequents(X : N -> G, (Σ, M, Γ, Ξ), Depth, Used, Abducibles) :-
@@ -52,7 +95,7 @@ l_sequents(_ : bot, _, _) :- fail.
 % ∧ L
 l_sequents(X : N1 and N2, (Σ, M, Γ, Ξ, WG), (Σ, M, Γ, [X : N1, X : N2 | Ξ], WG)).
 
-% ∨: left
+% ∨ L
 l_sequents(X : N1 or N2, (Σ, M, Γ, Ξ, WG), [(Σ, M, Γ, [X : N1 | Ξ], WG), (Σ, M, Γ, [X : N2 | Ξ], WG)]).
 
 % pr
@@ -67,7 +110,7 @@ expand_l_sequents((Σ, M, Γ, Ξ, WG), Depth, Used, Abducibles) :-
     select(X, Ξ, Ξ_X),
     l_sequents(X, (Σ, M, Γ, Ξ_X, WG), Result), !,
     (is_list(Result) ->
-        ([L, R] = Result, expand_l_sequents(L, Depth, Used, Abducibles_L), expand_l_sequents(R, Depth, Used, Abducibles_R), append(Abducibles_L, Abducibles_R, Abducibles));
+        ([L, R] = Result, expand_l_sequents(L, Depth, Used, Abducibles_L), expand_l_sequents(R, Depth, Used, Abducibles_R), un(Abducibles_L, Abducibles_R, Abducibles));
         expand_l_sequents(Result, Depth, Used, Abducibles)).
 
 expand_l_sequents((Σ, M, Γ, Ξ, WG), _, _, (Σ, M, Γ_, WG)) :-
@@ -128,35 +171,38 @@ f_sequents(X : A says D, (Σ, M, WP), Used, Used_, G1Gn) :-
     member(s(X, A, Y), M),
     f_sequents(Y : D, (Σ, M, WP), [(X : A says D, Y) | Used], Used_, G1Gn).
 
-get_abducibles([], success, []) :- !.
+cartesian_product(empty, H, H) :- !.
 
-get_abducibles(AG1Gn, failure, AG1Gn_) :-
-    (length(AG1Gn, 1) ->
-        nth0(0, AG1Gn, AG1Gn_);
-        (maplist(nth0(0), AG1Gn, AG1Gn__), AG1Gn_ = [AG1Gn__])).
+cartesian_product(H, empty, H) :- !.
 
-nd_choice([], _, _, _, Status, Status, []).
+cartesian_product(H1, H2, H) :-
+    in(H1, H2, H).
+
+nd_choice([], _, _, _, Status, Status, empty).
 
 % choice - left branch successful
 nd_choice([H | T], (Σ, M, Γ, WP), Depth, Used, _, StatusU, Abducibles) :-
     f_sequents(H, (Σ, M, WP), Used, Used_, G1Gn), !,
     maplist(n2r((Σ, M, Γ, []), Depth, [H | Used_]), G1Gn, AG1Gn),
-    subtract(AG1Gn, [[]], AG1Gn_NonEmpty),
-    get_abducibles(AG1Gn_NonEmpty, StatusH, Abducibles_H),
-    ((StatusH = success) ->
-        StatusU = StatusH;
-        (nd_choice(T, (Σ, M, Γ, WP), Depth, Used, failure, StatusU, Abducibles_T), append(Abducibles_H, Abducibles_T, Abducibles))).
+    subtract(AG1Gn, [empty], Abducibles_H),
+    ((Abducibles_H = []) ->
+        StatusU = success;
+        (nd_choice(T, (Σ, M, Γ, WP), Depth, Used, failure, StatusU, Abducibles_T), cartesian_product(Abducibles_H, Abducibles_T, Abducibles))).
 
 % choice - left branch unsuccessful
 nd_choice([_ | T], (Σ, M, Γ, WP), Depth, Used, _, Status, Abducibles) :-
     nd_choice(T, (Σ, M, Γ, WP), Depth, Used, failure, Status, Abducibles).
 
+join(empty, H, H) :- !.
+
+join(H1, H2, [H2 | H1]).
+
 n_sequents((Σ, M, Γ, WP), Depth, Used, Abducibles) :-
     subtract(Γ, Used, Γ_),
     nd_choice(Γ_, (Σ, M, Γ, WP), Depth, Used, failure, Status, Abducibles_ND),
     ((Status = success) ->
-        Abducibles = [];
-        Abducibles = [(Σ, M, Γ, WP) | Abducibles_ND]).
+        Abducibles = empty;
+        join(Abducibles_ND, (Σ, M, Γ, WP), Abducibles)).
 
 n2r(Context, Depth, Used, WiGi, AWiGi) :-
     r_sequents(WiGi, Context, Depth, Used, AWiGi).

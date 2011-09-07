@@ -37,6 +37,12 @@ formula(Bottom, [s(_, A, _) | T], A says Formula) :-
     formula(Bottom, T, Formula).
 
 formulae(M, X : Y, Formulae) :-
-    every_path(M, u, X, Paths),
+    !, every_path(M, u, X, Paths),
     maplist(formula(Y), Paths, Formulae_XL),
     list_to_set(Formulae_XL, Formulae).
+
+formulae(_, [], []) :- !.
+
+formulae(M, [X : Y | T], [Formulae_X | Formulae]) :-
+    formulae(M, X : Y, Formulae_X),
+    formulae(M, T, Formulae).
