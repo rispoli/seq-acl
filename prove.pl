@@ -3,6 +3,9 @@
 :- [countermodel].
 :- dynamic(non_provable/0).
 
+cook_abducibles((_, M, _, WP), [Abducibles]) :-
+    !, formulae(M, WP, Abducibles).
+
 cook_abducibles([], []).
 
 cook_abducibles([(_, M, _, WP) | T], Abducibles) :-
