@@ -6,19 +6,16 @@ ARGTABLEL=$(ARGTABLE_PATH)/lib
 ARGTABLEO=$(ARGTABLEL)/libargtable2.a
 LDFLAGS=-L$(ARGTABLEL)
 
-all: server client
+SRCS=$(wildcard *.cpp)
+EXECS=$(SRCS:%.cpp=%)
 
-server.o: server.cpp message.h
+all: $(EXECS)
+
+%.o: %.cpp message.h
 	$(CC) $(CFLAGS) -c $(ARGTABLEI) $< -o $@
 
-server: server.o
-	$(CC) $(LDFLAGS) $< $(ARGTABLEO) -o $@
-
-client.o: client.cpp message.h
-	$(CC) $(CFLAGS) -c $(ARGTABLEI) $< -o $@
-
-client: client.o
+$(EXECS): %: %.o
 	$(CC) $(LDFLAGS) $< $(ARGTABLEO) -o $@
 
 clean:
-	-rm -f server.o server client.o client
+	-rm -f *.o $(EXECS)

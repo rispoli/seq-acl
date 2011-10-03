@@ -1,66 +1,62 @@
-:- [deduction_tree].
+:- [prove].
 :- [grounder].
-:- [countermodel].
 
-nested_or(L or R, NO) :-
-    !, nested_or(L, NL),
-    pretty_print(R, PR),
-    format(atom(NO), '~w;~w', [NL, PR]).
+stringConcat([], Output, Output).
 
-nested_or(X, PX) :-
-    pretty_print(X, PX).
+stringConcat([H | T], TempString, Output) :-
+    format(atom(H_), '~w', H),
+    string_concat(TempString, H_, TempString_),
+    stringConcat(T, TempString_, Output).
 
-pretty_print(L or R, PO) :-
-    !, nested_or(L, NL),
-    pretty_print(R, PR),
-    format(atom(PO), '{~w;~w}', [NL, PR]).
+inner_join([], _, _, '').
 
-pretty_print([], '') :- !.
+inner_join([Last], _, TempString, Output) :-
+    format(atom(L), '~w', Last),
+    string_concat(TempString, L, Output).
 
-pretty_print([L, R], PO) :-
-    is_list(L), is_list(R), !,
-    pretty_print(L, PL),
-    pretty_print(R, PR),
-    format(atom(PO), '~w~w', [PL, PR]).
+inner_join([H | T], Separator, TempString, Output) :-
+    stringConcat([H, Separator], TempString, TempString_),
+    inner_join(T, Separator, TempString_, Output).
 
-pretty_print(L, PL) :-
+join_(List, Separator, Output) :-
+    inner_join(List, Separator, '', Output), !.
+
+pretty_print__([L]) :-
+    !, pretty_print_(L).
+
+pretty_print__([H | T]) :-
+    pretty_print_(H),
+    write(';'),
+    pretty_print__(T).
+
+pretty_print_(L) :-
     is_list(L), !,
-    maplist(pretty_print, L, PL).
+    partition(is_list, L, Inner_lists, Inner_atoms),
+    ((Inner_lists = []) ->
+        (write('['), join_(Inner_atoms, ';', O), write(O), write(']'));
+        pretty_print__(Inner_lists)).
 
-pretty_print(X, PX) :-
-    format(atom(PX), '~w', X).
+pretty_print_(X) :-
+    format('~w', X).
 
-empty_closed_premise(([_, []], Label)) :-
-    Label \= ''.
+pretty_print([]) :-
+    !, write('{}').
 
-get_result(In, Out) :-
-    length(In, 1) ->
-        nth0(0, In, Out);
-        In = Out.
-
-print_leaves(([(_, M, _, Δ), []], ''), X) :-
-    !, formulae(M, Δ, XE),
-    subtract(XE, [[]], XO),
-    get_result(XO, X).
-
-print_leaves(([_, L_Premises], _) or ([_, R_Premises], _), L_Leaves or R_Leaves) :-
-    maplist(print_leaves, L_Premises, L_Leaves_FO), get_result(L_Leaves_FO, L_Leaves),
-    maplist(print_leaves, R_Premises, R_Leaves_FO), get_result(R_Leaves_FO, R_Leaves).
-
-print_leaves(([_, Premises], _), Leaves) :-
-    exclude(empty_closed_premise, Premises, PremisesNE),
-    maplist(print_leaves, PremisesNE, LeavesO), get_result(LeavesO, Leaves).
+pretty_print(Abducibles) :-
+    write('{'), maplist(pretty_print_, Abducibles), write('}').
 
 prove_c(Policy_F, Principal, Request) :-
     smart_grounder(Policy_F, Principal, Request, Policy),
-    prove((Policy) -> (Request), T),
+    prove((Policy) -> (Request), Abducibles),
     (non_provable ->
-        (print_leaves(T, L), ((L = []) -> PL = []; pretty_print(L, PL)), write(PL));
+        pretty_print(Abducibles);
         write(granted)).
 
 prove_c(Policy_F, Principal, Credentials, Request) :-
     smart_grounder(Policy_F, Principal, Request, Policy),
-    prove(((Policy) and (Credentials)) -> (Request), T),
+    ((Policy = []) ->
+        prove((Credentials) -> (Request), Abducibles);
+        prove(((Policy) and (Credentials)) -> (Request), Abducibles)),
     (non_provable ->
-        (print_leaves(T, L), ((L = []) -> PL = []; pretty_print(L, PL)), write(PL));
+        pretty_print(Abducibles);
         write(granted)).

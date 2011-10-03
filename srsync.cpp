@@ -401,7 +401,7 @@ string process_credentials(const char *fn) {
 	return credentials;
 }
 
-void process_requests(string whoami, const char *fn, string credentials, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
+int process_requests(string whoami, const char *fn, string credentials, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
 	ifstream f(fn);
 	if(!f.is_open()) {
 		cerr << "Could not open request file" << endl;
@@ -409,16 +409,50 @@ void process_requests(string whoami, const char *fn, string credentials, map<str
 	}
 	string line;
 	size_t p;
+	int r = FAILURE;
 	while(f.good()) {
 		getline(f, line);
 		if((p = line.find("@")) != string::npos) {
-			process_query(whoami, line.substr(line.find_first_not_of(" \t", p + 1), line.find_last_not_of(" \t") - line.find_first_not_of(" \t", p + 1) + 1), credentials, line.substr(0, p), addresses, interactive, history);
+			r = process_query(whoami, line.substr(line.find_first_not_of(" \t", p + 1), line.find_last_not_of(" \t") - line.find_first_not_of(" \t", p + 1) + 1), credentials, line.substr(0, line.find_last_not_of(" \t", p - 1) + 1), addresses, interactive, history);
 		} else if(line != "") {
 			cerr << "Malformed request file" << endl;
 			exit(EXIT_FAILURE);
 		}
 	}
 	f.close();
+	return r;
+}
+
+void rsync(string whoami, const char *fn) {
+	ifstream f(fn);
+	if(!f.is_open()) {
+		cerr << "Could not open request file" << endl;
+		exit(EXIT_FAILURE);
+	}
+	stringstream rsync_cmd;
+	while(f.good()) {
+		string line;
+		getline(f, line);
+		size_t p;
+		if((p = line.find("@")) != string::npos) {
+			rsync_cmd << "rsync -a " << whoami << "@" << line.substr(line.find_first_not_of(" \t", p + 1), ((line.find_last_of(":") != string::npos) ? line.find_last_of(":") - 1 : line.find_last_not_of(" \t")) - line.find_first_not_of(" \t", p + 1) + 1) << "::" << line.substr(0, line.find_last_not_of(" \t", p - 1) + 1) << " " << line.substr(0, line.find_last_not_of(" \t", p - 1) + 1); // << " 2>&1";
+			cout << rsync_cmd.str() << endl;
+		} else if(line != "") {
+			cerr << "Malformed request file" << endl;
+			exit(EXIT_FAILURE);
+		}
+	}
+	f.close();
+
+	FILE *fpipe;
+	if(!(fpipe = popen(rsync_cmd.str().c_str(), "r"))) {
+		cerr << "Could not execute command: " << rsync_cmd.str() << " (" << errno << ")" << endl;
+		exit(EXIT_FAILURE);
+	}
+	int exit_status = pclose(fpipe);
+
+	if(WEXITSTATUS(exit_status))
+		exit(EXIT_FAILURE);
 }
 
 int main(int argc, char *argv[]) {
@@ -457,11 +491,15 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	int r;
 	map<pair<string, size_t>, bool> history;
 	if(credentials->count > 0)
-		process_requests(whoami->sval[0], request->filename[0], process_credentials(credentials->filename[0]), process_addresses(addresses->filename[0]), interactive->count > 0, history);
+		r = process_requests(whoami->sval[0], request->filename[0], process_credentials(credentials->filename[0]), process_addresses(addresses->filename[0]), interactive->count > 0, history);
 	else
-		process_requests(whoami->sval[0], request->filename[0], "", process_addresses(addresses->filename[0]), interactive->count > 0, history);
+		r = process_requests(whoami->sval[0], request->filename[0], "", process_addresses(addresses->filename[0]), interactive->count > 0, history);
+
+	if(r == SUCCESS)
+		rsync(whoami->sval[0], request->filename[0]);
 
 	arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
 
