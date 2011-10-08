@@ -44,6 +44,8 @@ in___((Σ1, M1, Γ1, Δ1), (Σ2, M2, Γ2, Δ2), (Σ, M, Γ, [Δ1, Δ2])) :-
     union(M1, M2, M),
     union(Γ1, Γ2, Γ).
 
+un(empty, empty, empty) :- !.
+
 un(empty, H, [H]) :- !.
 
 un(H, empty, [H]) :- !.
@@ -115,9 +117,8 @@ l_rules(X : Alpha and Beta, (Σ, M, Γ, Δ), Used, Used, (Σ, M, [X : Alpha, X :
 l_rules(X : Alpha or Beta, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [X : Alpha | Γ], Δ), (Σ, M, [X : Beta | Γ], Δ)]).
 
 % says L
-l_rules(X : A says Alpha, (Σ, M, Γ, Δ), Used, [(s(X, A, Y), Y : Alpha) | Used], (Σ, M, [X : A says Alpha, Y : Alpha | Γ], Δ)) :-
+l_rules(X : A says Alpha, (Σ, M, Γ, Δ), Used, [(s(X, A, Y), A says Alpha) | Used], (Σ, M, [X : A says Alpha, Y : Alpha | Γ], Δ)) :-
     member(s(X, A, Y), M),
-    \+memberchk(Y : Alpha, Γ),
     \+memberchk((s(X, A, Y), A says Alpha), Used).
 
 % mon-S
