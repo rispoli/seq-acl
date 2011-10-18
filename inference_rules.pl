@@ -37,10 +37,11 @@ in___(empty, _, empty).
 
 in___(_, empty, empty).
 
-in___((Σ1, M1, Γ1, Δ1), (Σ2, M2, Γ2, Δ2), (Σ, M, Γ, [Δ1, Δ2])) :-
+in___((Σ1, M1, Γ1, Δ1), (Σ2, M2, Γ2, Δ2), (Σ, M, Γ, Δ)) :-
     union(Σ1, Σ2, Σ),
     union(M1, M2, M),
-    union(Γ1, Γ2, Γ).
+    union(Γ1, Γ2, Γ),
+    (is_list(Δ2) -> Δ = [Δ1 | Δ2]; Δ = [Δ1, Δ2]).
 
 un(empty, empty, empty) :- !.
 
@@ -142,10 +143,15 @@ sat_sequents(Σ, M, Σ, [s(Y, A, Y) | M]) :-
     \+memberchk(s(Y, A, Y), M).
 
 % S-I
-sat_sequents(Σ, M, Σ, [s(X, A, Z) | M]) :-
-    member(s(X, _, Y), M),
-    member(s(Y, A, Z), M),
-    \+memberchk(s(X, A, Z), M).
+%sat_sequents(Σ, M, Σ, [s(X, A, Z) | M]) :-
+%    member(s(X, _, Y), M),
+%    member(s(Y, A, Z), M),
+%    \+memberchk(s(X, A, Z), M).
+
+% unit
+sat_sequents(Σ, M, Σ, [X <= Y | M]) :-
+     member(s(X, _, Y), M),
+     \+memberchk(X <= Y, M).
 
 expand_sat_sequents(Σ, M, Σ_S, M_S) :-
     sat_sequents(Σ, M, Σ_S_I, M_S_I), !,
@@ -178,7 +184,7 @@ cartesian_product(empty, H, H) :- !.
 cartesian_product(H, empty, H) :- !.
 
 cartesian_product(H1, H2, H) :-
-    in(H1, H2, H).
+    in(H1, H2, H_F), flatten(H_F, H).
 
 nd_choice([], _, _, _, Status, Status, empty).
 
