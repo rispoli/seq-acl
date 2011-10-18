@@ -39,10 +39,11 @@ in___(empty, _, empty).
 
 in___(_, empty, empty).
 
-in___((Σ1, M1, Γ1, Δ1), (Σ2, M2, Γ2, Δ2), (Σ, M, Γ, [Δ1, Δ2])) :-
+in___((Σ1, M1, Γ1, Δ1), (Σ2, M2, Γ2, Δ2), (Σ, M, Γ, Δ)) :-
     union(Σ1, Σ2, Σ),
     union(M1, M2, M),
-    union(Γ1, Γ2, Γ).
+    union(Γ1, Γ2, Γ),
+    (is_list(Δ2) -> Δ = [Δ1 | Δ2]; Δ = [Δ1, Δ2]).
 
 un(empty, empty, empty) :- !.
 
@@ -146,11 +147,17 @@ sem_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
     ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles).
 
 % s-I-SS
+%ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+%    member(s(X, _, Y), M),
+%    member(s(Y, A, Z), M),
+%    \+memberchk(s(X, A, Z), M), !,
+%    prove((Σ, [s(X, A, Z) | M], Γ, Δ), Depth, Used, Abducibles).
+
+% unit
 ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    member(s(X, _, Y), M),
-    member(s(Y, A, Z), M),
-    \+memberchk(s(X, A, Z), M), !,
-    prove((Σ, [s(X, A, Z) | M], Γ, Δ), Depth, Used, Abducibles).
+     member(s(X, _, Y), M),
+     \+memberchk(X <= Y, M), !,
+     prove((Σ, [X <= Y | M], Γ, Δ), Depth, Used, Abducibles).
 
 % s-C
 ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
