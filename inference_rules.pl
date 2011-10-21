@@ -39,11 +39,12 @@ in___(empty, _, empty).
 
 in___(_, empty, empty).
 
-in___((Σ1, M1, Γ1, Δ1), (Σ2, M2, Γ2, Δ2), (Σ, M, Γ, Δ)) :-
+in___((Σ1, M1, Γ1, Δ1, Δ_S1), (Σ2, M2, Γ2, Δ2, Δ_S2), (Σ, M, Γ, Δ, Δ_S)) :-
     union(Σ1, Σ2, Σ),
     union(M1, M2, M),
     union(Γ1, Γ2, Γ),
-    (is_list(Δ2) -> Δ = [Δ1 | Δ2]; Δ = [Δ1, Δ2]).
+    (is_list(Δ2) -> Δ = [Δ1 | Δ2]; Δ = [Δ1, Δ2]),
+    union(Δ_S1, Δ_S2, Δ_S).
 
 un(empty, empty, empty) :- !.
 
@@ -54,163 +55,214 @@ un(H, empty, [H]) :- !.
 un(H1, H2, [H1, H2]).
 
 % ⊤ R
-prove((_, _, _, _ : top), _, _, empty) :- !.
+prove((_, _, _, _ : top, _), _, _, empty) :- !.
 
 % init
-prove((_, M, Γ, Y : P), _, _, empty) :-
+prove((_, M, Γ, Y : P, _), _, _, empty) :-
     member(X <= Y, M),
     member(X : P, Γ), !.
 
 % ⊥ L
-prove((_, _, Γ, _), _, _, empty) :-
+prove((_, _, Γ, _, _), _, _, empty) :-
     memberchk(_ : bot, Γ).
 
-prove((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    r_rules(Δ, (Σ, M, Γ), Depth, Used, Abducibles).
+prove((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    r_rules(Δ, (Σ, M, Γ, Δ_S), Depth, Used, Abducibles).
 
 % ∧ R
-r_rules(X : Alpha and Beta, (Σ, M, Γ), Depth, Used, Abducibles) :-
-    !, prove((Σ, M, Γ, X : Alpha), Depth, Used, Abducibles_Alpha),
-    prove((Σ, M, Γ, X : Beta), Depth, Used, Abducibles_Beta),
+r_rules(X : Alpha and Beta, (Σ, M, Γ, Δ_S), Depth, Used, Abducibles) :-
+    !, prove((Σ, M, Γ, X : Alpha, Δ_S), Depth, Used, Abducibles_Alpha),
+    prove((Σ, M, Γ, X : Beta, Δ_S), Depth, Used, Abducibles_Beta),
     un(Abducibles_Alpha, Abducibles_Beta, Abducibles).
 
 % ∨ R
-r_rules(X : Alpha or Beta, (Σ, M, Γ), Depth, Used, Abducibles) :-
-    !, prove((Σ, M, Γ, X : Alpha), Depth, Used, Abducibles_Alpha),
+r_rules(X : Alpha or Beta, (Σ, M, Γ, Δ_S), Depth, Used, Abducibles) :-
+    !, prove((Σ, M, Γ, X : Alpha, Δ_S), Depth, Used, Abducibles_Alpha),
     ((Abducibles_Alpha = empty) ->
         Abducibles = empty;
-        (prove((Σ, M, Γ, X : Beta), Depth, Used, Abducibles_Beta),
+        (prove((Σ, M, Γ, X : Beta, Δ_S), Depth, Used, Abducibles_Beta),
         ((Abducibles_Beta = empty) ->
             Abducibles = empty;
             in(Abducibles_Alpha, Abducibles_Beta, Abducibles)))).
 
 % → R
-r_rules(X : Alpha -> Beta, (Σ, M, Γ), Depth, Used, Abducibles) :-
+r_rules(X : Alpha -> Beta, (Σ, M, Γ, Δ_S), Depth, Used, Abducibles) :-
     max_distance(M, u, X, Distance),
-    Distance =< Depth, !,
+    (Distance < Depth; \+loop(X, M, Γ, [X : Alpha -> Beta | Δ_S])), !,
     gensym(y_, Y),
-    prove(([Y | Σ], [X <= Y | M], [Y : Alpha | Γ], Y : Beta), Depth, Used, Abducibles).
+    prove(([Y | Σ], [X <= Y | M], [Y : Alpha | Γ], Y : Beta, [X : Alpha -> Beta | Δ_S]), Depth, Used, Abducibles).
 
 % says R
-r_rules(X : A says Alpha, (Σ, M, Γ), Depth, Used, Abducibles) :-
+r_rules(X : A says Alpha, (Σ, M, Γ, Δ_S), Depth, Used, Abducibles) :-
     max_distance(M, u, X, Distance),
-    Distance =< Depth, !,
+    (Distance < Depth; \+loop(X, M, Γ, [X : A says Alpha | Δ_S])), !,
     gensym(y_, Y),
-    prove(([Y | Σ], [s(X, A, Y) | M], Γ, Y : Alpha), Depth, Used, Abducibles).
+    prove(([Y | Σ], [s(X, A, Y) | M], Γ, Y : Alpha, [X : A says Alpha | Δ_S]), Depth, Used, Abducibles).
 
-r_rules(Δ, (Σ, M, Γ), Depth, Used, Abducibles) :-
-    expand_l_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles).
+r_rules(Δ, (Σ, M, Γ, Δ_S), Depth, Used, Abducibles) :-
+    expand_l_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
-expand_l_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+ancestors_([], _, _, []).
+
+ancestors_([W <= X | T], M, X, A) :-
+    !, ancestors_(T, M, X, AT),
+    ancestors_(M, M, W, AW),
+    append([W | AT], AW, A).
+
+ancestors_([s(W, _, X) | T], M, X, A) :-
+    !, ancestors_(T, M, X, AT),
+    ancestors_(M, M, W, AW),
+    append([W | AT], AW, A).
+
+ancestors_([_ | T], M, X, AT) :-
+    ancestors_(T, M, X, AT).
+
+ancestors(M, X, A) :-
+    ancestors_(M, M, X, A_L),
+    list_to_set(A_L, A_S),
+    subtract(A_S, [X], A).
+
+label_X(X, X : _).
+
+match__([], _, _).
+
+match__([_ : F | T], Δ_S, Y) :-
+    member(Y : F, Δ_S),
+    match__(T, Δ_S, Y).
+
+match_([], Δ_S_X, _, Δ_S, Y) :-
+    match__(Δ_S_X, Δ_S, Y).
+
+match_([_ : F | T], Δ_S_X, Γ, Δ_S, Y) :-
+    member(Y : F, Γ),
+    match_(T, Δ_S_X, Γ, Δ_S, Y).
+
+match([], [_ : F | T], A, _, Δ_S) :-
+    member(Y : F, Δ_S),
+    member(Y, A),
+    match__(T, Δ_S, Y).
+
+match([_ : F | T], Δ_S_X, A, Γ, Δ_S) :-
+    member(Y : F, Γ),
+    member(Y, A),
+    match_(T, Δ_S_X, Γ, Δ_S, Y).
+
+loop(X, M, Γ, Δ_S) :-
+    ancestors(M, X, A),
+    include(label_X(X), Δ_S, Δ_S_X),
+    include(label_X(X), Γ, Γ_X),
+    match(Γ_X, Δ_S_X, A, Γ, Δ_S).
+
+expand_l_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     select(X, Γ, Γ_X),
-    l_rules(X, (Σ, M, Γ_X, Δ), Used, Used_, Result), !,
+    l_rules(X, (Σ, M, Γ_X, Δ, Δ_S), Used, Used_, Result), !,
     (is_list(Result) ->
         ([L, R] = Result, prove(L, Depth, Used_, Abducibles_L), prove(R, Depth, Used_, Abducibles_R), un(Abducibles_L, Abducibles_R, Abducibles));
         prove(Result, Depth, Used_, Abducibles)).
 
-expand_l_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    sem_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles).
+expand_l_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    sem_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 % ∧ L
-l_rules(X : Alpha and Beta, (Σ, M, Γ, Δ), Used, Used, (Σ, M, [X : Alpha, X : Beta | Γ], Δ)).
+l_rules(X : Alpha and Beta, (Σ, M, Γ, Δ, Δ_S), Used, Used, (Σ, M, [X : Alpha, X : Beta | Γ], Δ, Δ_S)).
 
 % ∨ L
-l_rules(X : Alpha or Beta, (Σ, M, Γ, Δ), Used, Used, [(Σ, M, [X : Alpha | Γ], Δ), (Σ, M, [X : Beta | Γ], Δ)]).
+l_rules(X : Alpha or Beta, (Σ, M, Γ, Δ, Δ_S), Used, Used, [(Σ, M, [X : Alpha | Γ], Δ, Δ_S), (Σ, M, [X : Beta | Γ], Δ, Δ_S)]).
 
 % says L
-l_rules(X : A says Alpha, (Σ, M, Γ, Δ), Used, [(s(X, A, Y), A says Alpha) | Used], (Σ, M, [X : A says Alpha, Y : Alpha | Γ], Δ)) :-
+l_rules(X : A says Alpha, (Σ, M, Γ, Δ, Δ_S), Used, [(s(X, A, Y), A says Alpha) | Used], (Σ, M, [X : A says Alpha, Y : Alpha | Γ], Δ, Δ_S)) :-
     member(s(X, A, Y), M),
     \+memberchk((s(X, A, Y), A says Alpha), Used).
 
 % mon-S
-sem_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+sem_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     member(X <= Y, M),
     member(s(Y, A, Z), M),
     member(Z <= W, M),
     \+memberchk(s(X, A, W), M), !,
-    prove((Σ, [s(X, A, W) | M], Γ, Δ), Depth, Used, Abducibles).
+    prove((Σ, [s(X, A, W) | M], Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 % trans
-sem_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+sem_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     member(X <= Y, M),
     member(Y <= Z, M),
     \+memberchk(X <= Z, M), !,
-    prove((Σ, [X <= Z | M], Γ, Δ), Depth, Used, Abducibles).
+    prove((Σ, [X <= Z | M], Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 % refl
-sem_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+sem_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     member(X, Σ),
     \+memberchk(X <= X, M), !,
-    prove((Σ, [X <= X | M], Γ, Δ), Depth, Used, Abducibles).
+    prove((Σ, [X <= X | M], Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
-sem_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles).
+sem_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    ac_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 % s-I-SS
-%ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-%    member(s(X, _, Y), M),
-%    member(s(Y, A, Z), M),
-%    \+memberchk(s(X, A, Z), M), !,
-%    prove((Σ, [s(X, A, Z) | M], Γ, Δ), Depth, Used, Abducibles).
+ac_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    member(s(X, _, Y), M),
+    member(s(Y, A, Z), M),
+    \+memberchk(s(X, A, Z), M), !,
+    prove((Σ, [s(X, A, Z) | M], Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 % unit
-ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-     member(s(X, _, Y), M),
-     \+memberchk(X <= Y, M), !,
-     prove((Σ, [X <= Y | M], Γ, Δ), Depth, Used, Abducibles).
+%ac_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+%     member(s(X, _, Y), M),
+%     \+memberchk(X <= Y, M), !,
+%     prove((Σ, [X <= Y | M], Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 % s-C
-ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+ac_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     member(s(_, A, Y), M),
     \+memberchk(s(Y, A, Y), M), !,
-    prove((Σ, [s(Y, A, Y) | M], Γ, Δ), Depth, Used, Abducibles).
+    prove((Σ, [s(Y, A, Y) | M], Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
-ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    left_arrow((Σ, M, Γ, Δ), Depth, Used, Abducibles), !.
+ac_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    left_arrow((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles), !.
 
-ac_rules((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    cm((Σ, M, Γ, Δ), Depth, Used, Abducibles).
+ac_rules((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    cm((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 la(_ : _ -> _).
 
 % → L
-left_arrow((Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+left_arrow((Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     include(la, Γ, Γ_la),
     ((Γ_la = []) ->
         fail;
-        (la_f(Γ_la, (Σ, M, Γ, Δ), Depth, Used, Abducibles), ((Abducibles = eol) -> fail; true))).
+        (la_f(Γ_la, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles), ((Abducibles = eol) -> fail; true))).
 
 lal(X, X <= _).
 
 la_f([], _, _, _, eol).
 
-la_f([X : Alpha -> Beta | T], (Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+la_f([X : Alpha -> Beta | T], (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     include(lal(X), M, M_lal),
     ((M_lal = []) ->
         fail;
-        (la_l(M_lal, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Used, Abducibles_H), !,
+        (la_l(M_lal, X : Alpha -> Beta, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles_H), !,
         ((Abducibles_H = empty) ->
             Abducibles = empty;
-            (la_f(T, (Σ, M, Γ, Δ), Depth, Used, Abducibles_T), in(Abducibles_H, Abducibles_T, Abducibles))))).
+            (la_f(T, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles_T), in(Abducibles_H, Abducibles_T, Abducibles))))).
 
-la_f([_ | T], (Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    la_f(T, (Σ, M, Γ, Δ), Depth, Used, Abducibles).
+la_f([_ | T], (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    la_f(T, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 la_l([], _, _, _, _, eol).
 
-la_l([X <= Y | T], X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
+la_l([X <= Y | T], X : Alpha -> Beta, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
     \+memberchk(Y : Beta, Γ),
     \+memberchk((X <= Y, Alpha -> Beta), Used), !,
-    prove((Σ, M, [Y : Beta | Γ], Δ), Depth, [(X <= Y, Alpha -> Beta) | Used], Abducibles_Beta),
+    prove((Σ, M, [Y : Beta | Γ], Δ, Δ_S), Depth, [(X <= Y, Alpha -> Beta) | Used], Abducibles_Beta),
     ((Abducibles_Beta = empty) ->
-        (prove((Σ, M, Γ, Y : Alpha), Depth, [(X <= Y, Alpha -> Beta) | Used], Abducibles_Alpha),
+        (prove((Σ, M, Γ, Y : Alpha, Δ_S), Depth, [(X <= Y, Alpha -> Beta) | Used], Abducibles_Alpha),
         ((Abducibles_Alpha = empty) ->
             Abducibles = empty;
-            (la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Used, Abducibles_T), in(Abducibles_Alpha, Abducibles_T, Abducibles))));
-            la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Used, Abducibles)).
+            (la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles_T), in(Abducibles_Alpha, Abducibles_T, Abducibles))));
+            la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles)).
 
-la_l([_ | T], X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Used, Abducibles) :-
-    la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ), Depth, Used, Abducibles).
+la_l([_ | T], X : Alpha -> Beta, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles) :-
+    la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Δ, Δ_S), Depth, Used, Abducibles).
 
 % CM
-cm((Σ, M, Γ, Δ), _, _, (Σ, M, Γ, Δ)).
+cm((Σ, M, Γ, Δ, Δ_S), _, _, (Σ, M, Γ, Δ, Δ_S)).
