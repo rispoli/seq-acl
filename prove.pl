@@ -5,12 +5,12 @@
 
 empty([]).
 
-cook_abducibles((_, M, _, Δ, _), [Abducibles]) :-
+cook_abducibles((_, M, _, _, Δ, _), [Abducibles]) :-
     !, formulae(M, Δ, Abducibles_E), exclude(empty, Abducibles_E, Abducibles).
 
 cook_abducibles([], []).
 
-cook_abducibles([(_, M, _, Δ, _) | T], Abducibles) :-
+cook_abducibles([(_, M, _, _, Δ, _) | T], Abducibles) :-
     !, formulae(M, Δ, Abducibles_H_E), exclude(empty, Abducibles_H_E, Abducibles_H),
     cook_abducibles(T, Abducibles_T),
     ((Abducibles_H = []) ->
@@ -25,7 +25,7 @@ cook_abducibles([H | T], [Abducibles_H | Abducibles_T]) :-
 prove(F, Abducibles) :-
     depth(F, D),
     retractall(non_provable), reset_gensym,
-    prove(([u], [u <= u], [], [u : F], []), D, [], Countermodels),
+    prove(([u], [u <= u], [], [], [u : F], []), D, [], Countermodels),
     ((Countermodels \= empty) ->
         (assert(non_provable), cook_abducibles(Countermodels, Abducibles));
         Abducibles = []).
