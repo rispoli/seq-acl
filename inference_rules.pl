@@ -37,10 +37,11 @@ in___(empty, _, empty).
 
 in___(_, empty, empty).
 
-in___((Σ1, M1, Γ1, Δ1, Δ_S1), (Σ2, M2, Γ2, Δ2, Δ_S2), (Σ, M, Γ, Δ, Δ_S)) :-
+in___((Σ1, M1, Γ1, Γ1_S, Δ1, Δ_S1), (Σ2, M2, Γ2, Γ2_S, Δ2, Δ_S2), (Σ, M, Γ, Γ_S, Δ, Δ_S)) :-
     union(Σ1, Σ2, Σ),
     union(M1, M2, M),
     union(Γ1, Γ2, Γ),
+    union(Γ1_S, Γ2_S, Γ_S),
     (is_list(Δ2) -> Δ = [Δ1 | Δ2]; Δ = [Δ1, Δ2]),
     union(Δ_S1, Δ_S2, Δ_S).
 
@@ -56,39 +57,39 @@ un(H1, H2, [H1, H2]).
 r_sequents(_ : top, _, _, _, empty) :- !.
 
 % says R
-r_sequents(X : A says G, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles) :-
+r_sequents(X : A says G, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
     gensym(y_, Y),
     max_distance(M, u, X, Distance),
-    (Distance < Depth; \+loop(X, M, Γ, [X : A says G | Δ_S])),
-    !, r_sequents(Y : G, ([Y | Σ], [s(X, A, Y) | M], Γ, Ξ, Δ_S), Depth, Used, Abducibles).
+    (Distance < Depth; (append(Γ, Γ_S, Γ_), \+loop(X, M, Γ_, [X : A says G | Δ_S]))),
+    !, r_sequents(Y : G, ([Y | Σ], [s(X, A, Y) | M], Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles).
 
 % ∧ R
-r_sequents(X : G1 and G2, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles) :-
-    !, r_sequents(X : G1, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles_G1),
-    r_sequents(X : G2, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles_G2),
+r_sequents(X : G1 and G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
+    !, r_sequents(X : G1, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G1),
+    r_sequents(X : G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G2),
     un(Abducibles_G1, Abducibles_G2, Abducibles).
 
 % ∨ R
-r_sequents(X : G1 or G2, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles) :-
-    !, r_sequents(X : G1, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles_G1),
+r_sequents(X : G1 or G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
+    !, r_sequents(X : G1, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G1),
     ((Abducibles_G1 = empty) ->
         Abducibles = empty;
-        (r_sequents(X : G2, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles_G2),
+        (r_sequents(X : G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G2),
         ((Abducibles_G2 = empty) ->
             Abducibles = empty;
             in(Abducibles_G1, Abducibles_G2, Abducibles)))).
 
 % → R
-r_sequents(X : N -> G, (Σ, M, Γ, Ξ, Δ_S), Depth, Used, Abducibles) :-
+r_sequents(X : N -> G, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
     gensym(y_, Y),
     max_distance(M, u, X, Distance),
-    (Distance < Depth; \+loop(X, M, Γ, [X : N -> G | Δ_S])),
-    !, expand_l_sequents(([Y | Σ], [X <= Y | M], Γ, [Y : N | Ξ], Y : G, Δ_S), Depth, Used, Abducibles).
+    (Distance < Depth; (append(Γ, Γ_S, Γ_), \+loop(X, M, Γ_, [X : N -> G | Δ_S]))),
+    !, expand_l_sequents(([Y | Σ], [X <= Y | M], Γ, Γ_S, [Y : N | Ξ], Y : G, Δ_S), Depth, Used, Abducibles).
 
 % atom
-r_sequents(X : P, (Σ, M, Γ, [], Δ_S), Depth, Used, Abducibles) :-
+r_sequents(X : P, (Σ, M, Γ, Γ_S, [], Δ_S), Depth, Used, Abducibles) :-
     !, expand_sat_sequents(Σ, M, Σ_S, M_S),
-    n_sequents((Σ_S, M_S, Γ, X : P, Δ_S), Depth, Used, Abducibles).
+    n_sequents((Σ_S, M_S, Γ, Γ_S, X : P, Δ_S), Depth, Used, Abducibles).
 
 ancestors_([], _, _, []).
 
@@ -114,61 +115,61 @@ label_X(X, X : _).
 
 match__([], _, _).
 
-match__([_ : F | T], Δ_S, Y) :-
-    member(Y : F, Δ_S),
-    match__(T, Δ_S, Y).
+match__([_ : F | T], Δ, Y) :-
+    member(Y : F, Δ),
+    match__(T, Δ, Y).
 
-match_([], Δ_S_X, _, Δ_S, Y) :-
-    match__(Δ_S_X, Δ_S, Y).
+match_([], Δ_X, _, Δ, Y) :-
+    match__(Δ_X, Δ, Y).
 
-match_([_ : F | T], Δ_S_X, Γ, Δ_S, Y) :-
+match_([_ : F | T], Δ_X, Γ, Δ, Y) :-
     member(Y : F, Γ),
-    match_(T, Δ_S_X, Γ, Δ_S, Y).
+    match_(T, Δ_X, Γ, Δ, Y).
 
-match([], [_ : F | T], A, _, Δ_S) :-
-    member(Y : F, Δ_S),
+match([], [_ : F | T], A, _, Δ) :-
+    member(Y : F, Δ),
     member(Y, A),
-    match__(T, Δ_S, Y).
+    match__(T, Δ, Y).
 
-match([_ : F | T], Δ_S_X, A, Γ, Δ_S) :-
+match([_ : F | T], Δ_X, A, Γ, Δ) :-
     member(Y : F, Γ),
     member(Y, A),
-    match_(T, Δ_S_X, Γ, Δ_S, Y).
+    match_(T, Δ_X, Γ, Δ, Y).
 
-loop(X, M, Γ, Δ_S) :-
+loop(X, M, Γ, Δ) :-
     ancestors(M, X, A),
-    include(label_X(X), Δ_S, Δ_S_X),
+    include(label_X(X), Δ, Δ_X),
     include(label_X(X), Γ, Γ_X),
-    match(Γ_X, Δ_S_X, A, Γ, Δ_S).
+    match(Γ_X, Δ_X, A, Γ, Δ).
 
 % ⊤ L
-l_sequents(_ : top, (Σ, M, Γ, Ξ, WG, Δ_S), (Σ, M, Γ, Ξ, WG, Δ_S)).
+l_sequents(_ : top, (Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), (Σ, M, Γ, Γ_S, Ξ, WG, Δ_S)).
 
 % ⊥ L
 l_sequents(_ : bot, _, _) :- fail.
 
 % ∧ L
-l_sequents(X : N1 and N2, (Σ, M, Γ, Ξ, WG, Δ_S), (Σ, M, Γ, [X : N1, X : N2 | Ξ], WG, Δ_S)).
+l_sequents(X : N1 and N2, (Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), (Σ, M, Γ, [X : N1 and N2 | Γ_S], [X : N1, X : N2 | Ξ], WG, Δ_S)).
 
 % ∨ L
-l_sequents(X : N1 or N2, (Σ, M, Γ, Ξ, WG, Δ_S), [(Σ, M, Γ, [X : N1 | Ξ], WG, Δ_S), (Σ, M, Γ, [X : N2 | Ξ], WG, Δ_S)]).
+l_sequents(X : N1 or N2, (Σ, M, Γ, Ξ, WG, Δ_S), [(Σ, M, Γ, [X : N1 or N2 | Γ_S], [X : N1 | Ξ], WG, Δ_S), (Σ, M, Γ, [X : N1 or N2 | Γ_S], [X : N2 | Ξ], WG, Δ_S)]).
 
 % pr
-l_sequents(X : D, (Σ, M, Γ, Ξ, WG, Δ_S), (Σ, M, [X : D | Γ], Ξ, WG, Δ_S)) :-
+l_sequents(X : D, (Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), (Σ, M, [X : D | Γ], Γ_S, Ξ, WG, Δ_S)) :-
     D \= bot.
 
 % L2R
-expand_l_sequents((Σ, M, Γ, [], WG, Δ_S), Depth, Used, Abducibles) :-
-    !, r_sequents(WG, (Σ, M, Γ, [], Δ_S), Depth, Used, Abducibles).
+expand_l_sequents((Σ, M, Γ, Γ_S, [], WG, Δ_S), Depth, Used, Abducibles) :-
+    !, r_sequents(WG, (Σ, M, Γ, Γ_S, [], Δ_S), Depth, Used, Abducibles).
 
-expand_l_sequents((Σ, M, Γ, Ξ, WG, Δ_S), Depth, Used, Abducibles) :-
+expand_l_sequents((Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), Depth, Used, Abducibles) :-
     select(X, Ξ, Ξ_X),
-    l_sequents(X, (Σ, M, Γ, Ξ_X, WG, Δ_S), Result), !,
+    l_sequents(X, (Σ, M, Γ, Γ_S, Ξ_X, WG, Δ_S), Result), !,
     (is_list(Result) ->
         ([L, R] = Result, expand_l_sequents(L, Depth, Used, Abducibles_L), expand_l_sequents(R, Depth, Used, Abducibles_R), un(Abducibles_L, Abducibles_R, Abducibles));
         expand_l_sequents(Result, Depth, Used, Abducibles)).
 
-expand_l_sequents((Σ, M, Γ, Ξ, WG, Δ_S), _, _, (Σ, M, Γ_, WG, Δ_S)) :-
+expand_l_sequents((Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), _, _, (Σ, M, Γ_, Γ_S, WG, Δ_S)) :-
     append(Γ, Ξ, Γ_).
 
 % s-mon
@@ -241,28 +242,28 @@ cartesian_product(H1, H2, H) :-
 nd_choice([], _, _, _, Status, Status, empty).
 
 % choice - left branch successful
-nd_choice([H | T], (Σ, M, Γ, WP, Δ_S), Depth, Used, _, StatusU, Abducibles) :-
+nd_choice([H | T], (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, _, StatusU, Abducibles) :-
     f_sequents(H, (Σ, M, WP), Used, Used_, G1Gn), !,
-    maplist(n2r((Σ, M, Γ, [], Δ_S), Depth, [H | Used_]), G1Gn, AG1Gn),
+    maplist(n2r((Σ, M, Γ, Γ_S, [], Δ_S), Depth, [H | Used_]), G1Gn, AG1Gn),
     subtract(AG1Gn, [empty], Abducibles_H),
     ((Abducibles_H = []) ->
         StatusU = success;
-        (nd_choice(T, (Σ, M, Γ, WP, Δ_S), Depth, Used, failure, StatusU, Abducibles_T), cartesian_product(Abducibles_H, Abducibles_T, Abducibles))).
+        (nd_choice(T, (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, failure, StatusU, Abducibles_T), cartesian_product(Abducibles_H, Abducibles_T, Abducibles))).
 
 % choice - left branch unsuccessful
-nd_choice([_ | T], (Σ, M, Γ, WP, Δ_S), Depth, Used, _, Status, Abducibles) :-
-    nd_choice(T, (Σ, M, Γ, WP, Δ_S), Depth, Used, failure, Status, Abducibles).
+nd_choice([_ | T], (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, _, Status, Abducibles) :-
+    nd_choice(T, (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, failure, Status, Abducibles).
 
 join(empty, H, H) :- !.
 
 join(H1, H2, [H2 | H1]).
 
-n_sequents((Σ, M, Γ, WP, Δ_S), Depth, Used, Abducibles) :-
+n_sequents((Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, Abducibles) :-
     subtract(Γ, Used, Γ_),
-    nd_choice(Γ_, (Σ, M, Γ, WP, Δ_S), Depth, Used, failure, Status, Abducibles_ND),
+    nd_choice(Γ_, (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, failure, Status, Abducibles_ND),
     ((Status = success) ->
         Abducibles = empty;
-        join(Abducibles_ND, (Σ, M, Γ, WP, Δ_S), Abducibles)).
+        join(Abducibles_ND, (Σ, M, Γ, Γ_S, WP, Δ_S), Abducibles)).
 
 n2r(Context, Depth, Used, WiGi, AWiGi) :-
     r_sequents(WiGi, Context, Depth, Used, AWiGi).
