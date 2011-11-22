@@ -58,56 +58,59 @@ r_rules(X : A says Alpha, (Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, ([Y | Σ], [s(X, A
     (Distance < Depth; (append(Γ, Γ_S, Γ_), append(Δ, Δ_S, Δ_), \+loop(X, M, Γ_, [X : A says Alpha | Δ_]))), !,
     gensym(y_, Y).
 
-ancestors_([], _, _, []).
-
-ancestors_([W <= X | T], M, X, A) :-
-    !, ancestors_(T, M, X, AT),
-    ancestors_(M, M, W, AW),
-    append([W | AT], AW, A).
-
-ancestors_([s(W, _, X) | T], M, X, A) :-
-    !, ancestors_(T, M, X, AT),
-    ancestors_(M, M, W, AW),
-    append([W | AT], AW, A).
-
-ancestors_([_ | T], M, X, AT) :-
-    ancestors_(T, M, X, AT).
-
-ancestors(M, X, A) :-
-    ancestors_(M, M, X, A_L),
-    list_to_set(A_L, A_S),
-    subtract(A_S, [X], A).
-
-label_X(X, X : _).
-
 match__([], _, _).
 
 match__([_ : F | T], Δ, Y) :-
     member(Y : F, Δ),
     match__(T, Δ, Y).
 
-match_([], Δ_X, _, Δ, Y) :-
-    match__(Δ_X, Δ, Y).
+match_([], Δ_F, _, Δ, Y) :-
+    match__(Δ_F, Δ, Y).
 
-match_([_ : F | T], Δ_X, Γ, Δ, Y) :-
+match_([_ : F | T], Δ_F, Γ, Δ, Y) :-
     member(Y : F, Γ),
-    match_(T, Δ_X, Γ, Δ, Y).
+    match_(T, Δ_F, Γ, Δ, Y).
 
-match([], [_ : F | T], A, _, Δ) :-
+match([], [X : F | T], _, Δ) :-
     member(Y : F, Δ),
-    member(Y, A),
+    X \= Y,
     match__(T, Δ, Y).
 
-match([_ : F | T], Δ_X, A, Γ, Δ) :-
+match([X : F | T], Δ_F, Γ, Δ) :-
     member(Y : F, Γ),
-    member(Y, A),
-    match_(T, Δ_X, Γ, Δ, Y).
+    X \= Y,
+    match_(T, Δ_F, Γ, Δ, Y).
+
+ancestors_imp(M, X, Y) :-
+    member(Y <= X, M).
+
+ancestors_imp(M, X, Y) :-
+    member(W <= X, M),
+    ancestors_imp(M, W, Y).
+
+ancestors_says(M, X, Y) :-
+    member(Y <= X, M); member(s(Y, _, X), M).
+
+ancestors_says(M, X, Y) :-
+    (member(W <= X, M); member(s(W, _, X), M)),
+    ancestors_says(M, W, Y).
+
+t(X, M, Γ, X : A says Phi) :-
+    !, ancestors_says(M, X, Y),
+    member(Y : A says Phi, Γ).
+
+t(X, M, Γ, X : Phi -> Psi) :-
+    !, ancestors_imp(M, X, Y),
+    member(Y : Phi -> Psi, Γ).
+
+t(X, _, _, X : _).
+
+f(X, X : _).
 
 loop(X, M, Γ, Δ) :-
-    ancestors(M, X, A),
-    include(label_X(X), Δ, Δ_X),
-    include(label_X(X), Γ, Γ_X),
-    match(Γ_X, Δ_X, A, Γ, Δ).
+    include(f(X), Δ, Δ_F),
+    include(t(X, M, Γ), Γ, Γ_T),
+    match(Γ_T, Δ_F, Γ, Δ).
 
 expand_l_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
     select(X, Γ, Γ_X),
