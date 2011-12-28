@@ -30,6 +30,7 @@ string options;
 string policy_fn;
 string log_fn;
 int log_level;
+bool gnu_prolog_f;
 struct in_addr sin_addr;
 
 #else
@@ -82,7 +83,7 @@ void log_message(string filename, string message) {
 DWORD WINAPI handle_query(void *lp) {
 	int &sock_fd = *(int *)lp;
 #else
-int handle_query(string executable_path, string options, int sock_fd, string policy_fn, string log_fn, int log_level, struct in_addr sin_addr) {
+int handle_query(string executable_path, string options, int sock_fd, string policy_fn, string log_fn, int log_level, bool gnu_prolog_f, struct in_addr sin_addr) {
 	signal(SIGCHLD, SIG_DFL);
 #endif
 
@@ -124,9 +125,15 @@ int handle_query(string executable_path, string options, int sock_fd, string pol
 
 	stringstream command;
 	if(credentials != NULL)
-		command << executable_path << options << " 'prove_c(" << policy_fn << ", " << string(principal) << ", " << string(credentials) << ", " << string(query) << ")' 2>&1";
+		if(gnu_prolog_f)
+			command << "./credentials.gnu " << policy_fn << " " << string(principal) << " '" << string(credentials) << "' '" << string(query) << "' | tail -n1";
+		else
+			command << executable_path << options << " \"prove_c('" << policy_fn << "', " << string(principal) << ", " << string(credentials) << ", " << string(query) << ")\" 2>&1";
 	else
-		command << executable_path << options << " 'prove_c(" << policy_fn << ", " << string(principal) << ", " << string(query) << ")' 2>&1";
+		if(gnu_prolog_f)
+			command << "./credentials.gnu " << policy_fn << " " << string(principal) << " '" << string(query) << "' | tail -n1";
+		else
+			command << executable_path << options << " \"prove_c('" << policy_fn << "', " << string(principal) << ", " << string(query) << ")\" 2>&1";
 cout << command.str() << endl;
 
 	FILE *fpipe;
@@ -221,11 +228,12 @@ int main(int argc, char *argv[]) {
 	struct arg_int *port_number = arg_int0("p", "port-number", NULL, "port number to listen on (default: 3333)");
 	struct arg_file *log_file = arg_file0("L", "log-file", NULL, "log-file path (default: queries.log)");
 	struct arg_int *log_l = arg_int0("l", "log-level", NULL, "0 - off, 1 - default, 2 - verbose");
+	struct arg_lit *gnu_prolog_flag = arg_lit0("g", "gnu-prolog", "use GNU Prolog version");
 	struct arg_end *end = arg_end(23);
 #ifdef __WINDOWS
-	void *argtable[] = {help, executable, policy, port_number, log_file, log_l, end};
+	void *argtable[] = {help, executable, policy, port_number, log_file, log_l, gnu_prolog_flag, end};
 #else
-	void *argtable[] = {help, daemon, executable, policy, port_number, log_file, log_l, end};
+	void *argtable[] = {help, daemon, executable, policy, port_number, log_file, log_l, gnu_prolog_flag, end};
 #endif
 
 	if(arg_nullcheck(argtable) != 0) {
@@ -274,6 +282,7 @@ int main(int argc, char *argv[]) {
 	int port_no = port_number->ival[0];
 	log_fn = log_file->filename[0];
 	log_level = log_l->ival[0];
+	gnu_prolog_f = gnu_prolog_flag->count > 0;
 #else
 	string executable_path = executable->filename[0];
 	string options = " -q -t halt -f credentials.pl -g";
@@ -281,6 +290,7 @@ int main(int argc, char *argv[]) {
 	int port_no = port_number->ival[0];
 	string log_fn = log_file->filename[0];
 	int log_level = log_l->ival[0];
+	bool gnu_prolog_f = gnu_prolog_flag->count > 0;
 #endif
 
 	arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
@@ -382,7 +392,7 @@ int main(int argc, char *argv[]) {
 					close(termination_pipe[0]);
 					close(termination_pipe[1]);
 					getsockname(new_sock_fd, (struct sockaddr *)&serv_addr_, &serv_addr_size);
-					return handle_query(executable_path, options, new_sock_fd, policy_fn, log_fn, log_level, cli_addr.sin_addr);
+					return handle_query(executable_path, options, new_sock_fd, policy_fn, log_fn, log_level, gnu_prolog_f, cli_addr.sin_addr);
 				default:
 					close(new_sock_fd);
 			}
