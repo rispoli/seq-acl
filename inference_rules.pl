@@ -49,13 +49,13 @@ r_rules(X : Alpha or Beta, (Σ, M, Γ, Γ_S, Δ, Δ_S), _, (Σ, M, Γ, Γ_S, [X 
 % → R
 r_rules(X : Alpha -> Beta, (Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, ([Y | Σ], [X <= Y | M], [Y : Alpha | Γ], Γ_S, [Y : Beta | Δ], [X : Alpha -> Beta | Δ_S])) :-
     max_distance(M, u, X, Distance),
-    (Distance < Depth; (append(Γ, Γ_S, Γ_), append(Δ, Δ_S, Δ_), \+loop(X, M, Γ_, [X : Alpha -> Beta | Δ_]))), !,
+    (Distance < Depth; (append(Γ, Γ_S, Γ_), append(Δ, Δ_S, Δ_), \+loop(X, M, Γ_, [X : Alpha -> Beta | Δ_], _))), !,
     gensym(y_, Y).
 
 % says R
 r_rules(X : A says Alpha, (Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, ([Y | Σ], [s(X, A, Y) | M], Γ, Γ_S, [Y : Alpha | Δ], [X : A says Alpha | Δ_S])) :-
     max_distance(M, u, X, Distance),
-    (Distance < Depth; (append(Γ, Γ_S, Γ_), append(Δ, Δ_S, Δ_), \+loop(X, M, Γ_, [X : A says Alpha | Δ_]))), !,
+    (Distance < Depth; (append(Γ, Γ_S, Γ_), append(Δ, Δ_S, Δ_), \+loop(X, M, Γ_, [X : A says Alpha | Δ_], _))), !,
     gensym(y_, Y).
 
 match__([], _, _).
@@ -71,12 +71,12 @@ match_([_ : F | T], Δ_F, Γ, Δ, Y) :-
     member(Y : F, Γ),
     match_(T, Δ_F, Γ, Δ, Y).
 
-match([], [X : F | T], _, Δ) :-
+match([], [X : F | T], _, Δ, Y) :-
     member(Y : F, Δ),
     X \= Y,
     match__(T, Δ, Y).
 
-match([X : F | T], Δ_F, Γ, Δ) :-
+match([X : F | T], Δ_F, Γ, Δ, Y) :-
     member(Y : F, Γ),
     X \= Y,
     match_(T, Δ_F, Γ, Δ, Y).
@@ -107,10 +107,10 @@ t(X, _, _, X : _).
 
 f(X, X : _).
 
-loop(X, M, Γ, Δ) :-
+loop(X, M, Γ, Δ, Y) :-
     include(f(X), Δ, Δ_F),
     include(t(X, M, Γ), Γ, Γ_T),
-    match(Γ_T, Δ_F, Γ, Δ).
+    match(Γ_T, Δ_F, Γ, Δ, Y).
 
 expand_l_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
     select(X, Γ, Γ_X),

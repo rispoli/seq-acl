@@ -1,34 +1,40 @@
 :- [inference_rules].
 :- [depth_distance].
-:- [countermodel].
+:- [abducibles].
+:- [countermodels].
 :- dynamic(non_provable/0).
 
 empty([]).
 
-cook_abducibles((_, M, _, _, Δ, _), [Abducibles]) :-
-    !, formulae(M, Δ, Abducibles_E), exclude(empty, Abducibles_E, Abducibles).
+cook_abducibles((Σ, M, Γ, Γ_S, Δ, Δ_S), [Abducibles], [Countermodels]) :-
+    !, formulae(M, Δ, Abducibles_E), exclude(empty, Abducibles_E, Abducibles),
+    countermodels((Σ, M, Γ, Γ_S, Δ, Δ_S), Countermodels).
 
-cook_abducibles([], []).
+cook_abducibles([], [], []).
 
-cook_abducibles([(_, M, _, _, Δ, _) | T], Abducibles) :-
+cook_abducibles([(Σ, M, Γ, Γ_S, Δ, Δ_S) | T], Abducibles, [Countermodels_H | Countermodels_T]) :-
     !, formulae(M, Δ, Abducibles_H_E), exclude(empty, Abducibles_H_E, Abducibles_H),
-    cook_abducibles(T, Abducibles_T),
+    countermodels((Σ, M, Γ, Γ_S, Δ, Δ_S), Countermodels_H),
+    cook_abducibles(T, Abducibles_T, Countermodels_T),
     ((Abducibles_H = []) ->
         Abducibles = Abducibles_T;
         append(Abducibles_H, Abducibles_T, Abducibles)).
 
-cook_abducibles([H | T], [Abducibles_H | Abducibles_T]) :-
+cook_abducibles([H | T], [Abducibles_H | Abducibles_T], [Countermodels_H | Countermodels_T]) :-
     is_list(H),
-    cook_abducibles(H, Abducibles_H),
-    cook_abducibles(T, Abducibles_T).
+    cook_abducibles(H, Abducibles_H, Countermodels_H),
+    cook_abducibles(T, Abducibles_T, Countermodels_T).
 
-prove(F, Abducibles) :-
+prove(F, Abducibles, Countermodels) :-
     depth(F, D),
     retractall(non_provable), reset_gensym,
-    prove(([u], [u <= u], [], [], [u : F], []), D, [], Countermodels),
-    ((Countermodels \= empty) ->
-        (assert(non_provable), cook_abducibles(Countermodels, Abducibles));
+    prove(([u], [u <= u], [], [], [u : F], []), D, [], A_C),
+    ((A_C \= empty) ->
+        (assert(non_provable), cook_abducibles(A_C, Abducibles, Countermodels));
         Abducibles = []).
 
+prove(F, Abducibles) :-
+    prove(F, Abducibles, _).
+
 prove(F) :-
-    prove(F, _), \+non_provable.
+    prove(F, _, _), \+non_provable.
