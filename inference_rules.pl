@@ -54,42 +54,49 @@ un(H, empty, [H]) :- !.
 un(H1, H2, [H1, H2]).
 
 % ⊤ R
-r_sequents(_ : top, _, _, _, empty) :- !.
+r_sequents(_ : top, _, Current_Depth, Max_Depth, _, empty) :-
+    Current_Depth =< Max_Depth, !.
 
 % says R
-r_sequents(X : A says G, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
+r_sequents(X : A says G, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    (Current_Depth =< Max_Depth; (append(Γ, Γ_S, Γ_), \+loop(X, M, Γ_, [X : A says G | Δ_S]))),
     gensym(y_, Y),
-    max_distance(M, u, X, Distance),
-    (Distance < Depth; (append(Γ, Γ_S, Γ_), \+loop(X, M, Γ_, [X : A says G | Δ_S]))),
-    !, r_sequents(Y : G, ([Y | Σ], [s(X, A, Y) | M], Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles).
+    Current_Depth_ is Current_Depth + 1,
+    !, r_sequents(Y : G, ([Y | Σ], [s(X, A, Y) | M], Γ, Γ_S, Ξ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
 
 % ∧ R
-r_sequents(X : G1 and G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
-    !, r_sequents(X : G1, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G1),
-    r_sequents(X : G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G2),
+r_sequents(X : G1 and G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    Current_Depth_ is Current_Depth + 1,
+    !, r_sequents(X : G1, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles_G1),
+    r_sequents(X : G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles_G2),
     un(Abducibles_G1, Abducibles_G2, Abducibles).
 
 % ∨ R
-r_sequents(X : G1 or G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
-    !, r_sequents(X : G1, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G1),
+r_sequents(X : G1 or G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    Current_Depth_ is Current_Depth + 1,
+    !, r_sequents(X : G1, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles_G1),
     ((Abducibles_G1 = empty) ->
         Abducibles = empty;
-        (r_sequents(X : G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles_G2),
+        (r_sequents(X : G2, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles_G2),
         ((Abducibles_G2 = empty) ->
             Abducibles = empty;
             in(Abducibles_G1, Abducibles_G2, Abducibles)))).
 
 % → R
-r_sequents(X : N -> G, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Depth, Used, Abducibles) :-
+r_sequents(X : N -> G, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    (Current_Depth =< Max_Depth; (append(Γ, Γ_S, Γ_), \+loop(X, M, Γ_, [X : N -> G | Δ_S]))),
     gensym(y_, Y),
-    max_distance(M, u, X, Distance),
-    (Distance < Depth; (append(Γ, Γ_S, Γ_), \+loop(X, M, Γ_, [X : N -> G | Δ_S]))),
-    !, expand_l_sequents(([Y | Σ], [X <= Y | M], Γ, Γ_S, [Y : N | Ξ], Y : G, Δ_S), Depth, Used, Abducibles).
+    Current_Depth_ is Current_Depth + 1,
+    !, expand_l_sequents(([Y | Σ], [X <= Y | M], Γ, Γ_S, [Y : N | Ξ], Y : G, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
 
 % atom
-r_sequents(X : P, (Σ, M, Γ, Γ_S, [], Δ_S), Depth, Used, Abducibles) :-
+r_sequents(X : P, (Σ, M, Γ, Γ_S, [], Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    Current_Depth_ is Current_Depth + 1,
     !, expand_sat_sequents(Σ, M, Σ_S, M_S),
-    n_sequents((Σ_S, M_S, Γ, Γ_S, X : P, Δ_S), Depth, Used, Abducibles).
+    n_sequents((Σ_S, M_S, Γ, Γ_S, X : P, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
 
 match__([], _, _).
 
@@ -162,17 +169,19 @@ l_sequents(X : D, (Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), (Σ, M, [X : D | Γ], Γ_S, �
     D \= bot.
 
 % L2R
-expand_l_sequents((Σ, M, Γ, Γ_S, [], WG, Δ_S), Depth, Used, Abducibles) :-
-    !, r_sequents(WG, (Σ, M, Γ, Γ_S, [], Δ_S), Depth, Used, Abducibles).
+expand_l_sequents((Σ, M, Γ, Γ_S, [], WG, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    !, r_sequents(WG, (Σ, M, Γ, Γ_S, [], Δ_S), Current_Depth, Max_Depth, Used, Abducibles).
 
-expand_l_sequents((Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), Depth, Used, Abducibles) :-
+expand_l_sequents((Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
     select(X, Ξ, Ξ_X),
     l_sequents(X, (Σ, M, Γ, Γ_S, Ξ_X, WG, Δ_S), Result), !,
+    Current_Depth_ is Current_Depth + 1,
     (is_list(Result) ->
-        ([L, R] = Result, expand_l_sequents(L, Depth, Used, Abducibles_L), expand_l_sequents(R, Depth, Used, Abducibles_R), un(Abducibles_L, Abducibles_R, Abducibles));
-        expand_l_sequents(Result, Depth, Used, Abducibles)).
+        ([L, R] = Result, expand_l_sequents(L, Current_Depth_, Max_Depth, Used, Abducibles_L), expand_l_sequents(R, Current_Depth_, Max_Depth, Used, Abducibles_R), un(Abducibles_L, Abducibles_R, Abducibles));
+        expand_l_sequents(Result, Current_Depth_, Max_Depth, Used, Abducibles)).
 
-expand_l_sequents((Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), _, _, (Σ, M, Γ_, Γ_S, WG, Δ_S)) :-
+expand_l_sequents((Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), _, _, _, (Σ, M, Γ_, Γ_S, WG, Δ_S)) :-
     append(Γ, Ξ, Γ_).
 
 % s-mon
@@ -242,31 +251,33 @@ cartesian_product(H, empty, H) :- !.
 cartesian_product(H1, H2, H) :-
     in(H1, H2, H_F), flatten(H_F, H).
 
-nd_choice([], _, _, _, Status, Status, empty).
+nd_choice([], _, _, _, _, Status, Status, empty).
 
 % choice - left branch successful
-nd_choice([H | T], (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, _, StatusU, Abducibles) :-
+nd_choice([H | T], (Σ, M, Γ, Γ_S, WP, Δ_S), Current_Depth, Max_Depth, Used, _, StatusU, Abducibles) :-
+    Current_Depth =< Max_Depth,
     f_sequents(H, (Σ, M, WP), Used, Used_, G1Gn), !,
-    maplist(n2r((Σ, M, Γ, Γ_S, [], Δ_S), Depth, [H | Used_]), G1Gn, AG1Gn),
+    Current_Depth_ is Current_Depth + 1,
+    maplist(n2r((Σ, M, Γ, Γ_S, [], Δ_S), Current_Depth_, Max_Depth, [H | Used_]), G1Gn, AG1Gn),
     subtract(AG1Gn, [empty], Abducibles_H),
     ((Abducibles_H = []) ->
         StatusU = success;
-        (nd_choice(T, (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, failure, StatusU, Abducibles_T), cartesian_product(Abducibles_H, Abducibles_T, Abducibles))).
+        (nd_choice(T, (Σ, M, Γ, Γ_S, WP, Δ_S), Current_Depth_, Max_Depth, Used, failure, StatusU, Abducibles_T), cartesian_product(Abducibles_H, Abducibles_T, Abducibles))).
 
 % choice - left branch unsuccessful
-nd_choice([_ | T], (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, _, Status, Abducibles) :-
-    nd_choice(T, (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, failure, Status, Abducibles).
+nd_choice([_ | T], (Σ, M, Γ, Γ_S, WP, Δ_S), Current_Depth, Max_Depth, Used, _, Status, Abducibles) :-
+    nd_choice(T, (Σ, M, Γ, Γ_S, WP, Δ_S), Current_Depth, Max_Depth, Used, failure, Status, Abducibles).
 
 join(empty, H, H) :- !.
 
 join(H1, H2, [H2 | H1]).
 
-n_sequents((Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, Abducibles) :-
+n_sequents((Σ, M, Γ, Γ_S, WP, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
     subtract(Γ, Used, Γ_),
-    nd_choice(Γ_, (Σ, M, Γ, Γ_S, WP, Δ_S), Depth, Used, failure, Status, Abducibles_ND),
+    nd_choice(Γ_, (Σ, M, Γ, Γ_S, WP, Δ_S), Current_Depth, Max_Depth, Used, failure, Status, Abducibles_ND),
     ((Status = success) ->
         Abducibles = empty;
         join(Abducibles_ND, (Σ, M, Γ, Γ_S, WP, Δ_S), Abducibles)).
 
-n2r(Context, Depth, Used, WiGi, AWiGi) :-
-    r_sequents(WiGi, Context, Depth, Used, AWiGi).
+n2r(Context, Current_Depth, Max_Depth, Used, WiGi, AWiGi) :-
+    r_sequents(WiGi, Context, Current_Depth, Max_Depth, Used, AWiGi).

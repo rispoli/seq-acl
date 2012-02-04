@@ -1,5 +1,5 @@
 :- [inference_rules].
-:- [depth_distance].
+%:- [depth].
 :- [countermodel].
 :- dynamic(non_provable/0).
 
@@ -21,9 +21,13 @@ cook_abducibles([H | T], [Abducibles_H | Abducibles_T]) :-
     cook_abducibles(T, Abducibles_T).
 
 prove(F, Abducibles) :-
-    depth(F, D),
+    prove(F, 10000000, Abducibles).
+
+prove(F, Max_Depth, Abducibles) :-
+    %depth(F, D),
+    %max_depth(Depth, Max_Depth),
     retractall(non_provable), reset_gensym,
-    r_sequents(u : F, ([u], [u <= u], [], [], [], []), D, [], Countermodels),
+    r_sequents(u : F, ([u], [u <= u], [], [], [], []), 0, Max_Depth, [], Countermodels),
     ((Countermodels \= empty) ->
         (assert(non_provable), cook_abducibles(Countermodels, Abducibles));
         Abducibles = []).
