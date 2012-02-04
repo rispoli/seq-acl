@@ -59,3 +59,10 @@ partition_([H|T], Pred, Incl, Excl) :-
     ;   Excl = [H|E],
         partition_(T, Pred, Incl, E)
     ).
+
+union([], L, L) :- !.
+union([H|T], L, R) :-
+    memberchk(H, L), !,
+    union(T, L, R).
+union([H|T], L, [H|R]) :-
+    union(T, L, R).

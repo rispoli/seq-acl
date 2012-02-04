@@ -1,4 +1,7 @@
-:- op(450, xfy, says),
+:- [principals].
+
+:- op(400, xfy, sf),
+   op(450, xfy, says),
    op(500, yfx, and),
    op(600, yfx, or),
    op(700, xfy, ->),
@@ -185,6 +188,45 @@ ac_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
     prove((Σ, [s(Y, A, Y) | M], Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
 
 ac_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
+    sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
+
+% sf-refl
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
+    member(X, Σ),
+    append(Γ, Δ, ΓΔ), set_principals(ΓΔ, P),
+    member(A, P),
+    \+memberchk(X : A sf A, Γ), !,
+    prove((Σ, M, [X : A sf A | Γ], Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
+
+% sf
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
+    member(s(X, B, Y), M),
+    member(X : A sf B, Γ),
+    \+memberchk(s(X, A, Y), M), !,
+    prove((Σ, [s(X, A, Y) | M], Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
+
+% sf-trans
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
+    member(X : A sf B, Γ),
+    member(X : B sf C, Γ),
+    \+memberchk(X : A sf C, Γ), !,
+    prove((Σ, M, [X : A sf C | Γ], Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
+
+% sf-unit
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
+    member(s(X, _, Y), M),
+    member(X : A sf B, Γ),
+    \+memberchk(Y : A sf B, Γ), !,
+    prove((Σ, M, [Y : A sf B | Γ], Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
+
+% sf-mon
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
+    member(X <= Y, M),
+    member(X : A sf B, Γ),
+    \+memberchk(Y : A sf B, Γ), !,
+    prove((Σ, M, [Y : A sf B | Γ], Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
+
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
     cm((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
 
 % CM
