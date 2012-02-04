@@ -27,7 +27,8 @@ credentials.gnu: $(PSRCS)
 	@cat credentials.pl | sed -e "s|:- \[\(.*\)\].|:- include('\1').|" -e 's/format(atom(\(.*\)), \(.*\), \(.*\))/format_to_atom(\1, \2, [\3])/' -e s/string_concat/atom_concat/ > $(GNU_FOLDER)/credentials.pl
 	@echo -e "\n:- include('gnu_prolog_utilities')." >> $(GNU_FOLDER)/credentials.pl
 	@cat prove.pl | sed -e "s|:- \[\(.*\)\].|:- include('\1').|" -e s/\s*reset_gensym,// -e s/assert/asserta/ > $(GNU_FOLDER)/prove.pl
-	@cat inference_rules.pl | sed -e 's/\(:-\)\? \+\(op(.*)\)./:- \2./' -e s/Σ/Sigma/g -e s/Γ/Gamma/g -e s/Δ/Delta/g -e s/include/filter/g > $(GNU_FOLDER)/inference_rules.pl
+	@cat inference_rules.pl | sed -e 's/\(:-\)\? \+\(op(.*)\)./:- \2./' -e s/Σ/Sigma/g -e s/Γ/Gamma/g -e s/Δ/Delta/g -e s/include/filter/g -e "s|:- \[\(.*\)\].|:- include('\1').|" > $(GNU_FOLDER)/inference_rules.pl
+	@cp principals.pl $(GNU_FOLDER)/principals.pl
 	@cp depth.pl $(GNU_FOLDER)/depth.pl
 	@cat countermodel.pl | sed -e s/list_to_set/sort/g > $(GNU_FOLDER)/countermodel.pl
 	@cat grounder.pl | sed -e 's/\(:-\)\? \+\(op(.*)\)./:- \2./' -e s/list_to_set/sort/g -e s/include/filter/g > $(GNU_FOLDER)/grounder.pl

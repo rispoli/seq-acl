@@ -1,4 +1,7 @@
-:- op(450, xfy, says),
+:- [principals].
+
+:- op(400, xfy, sf),
+   op(450, xfy, says),
    op(500, yfx, and),
    op(600, yfx, or),
    op(700, xfy, ->),
@@ -71,9 +74,7 @@ prove((_, _, Γ, _, _, _), Current_Depth, Max_Depth, _, empty) :-
     memberchk(_ : bot, Γ).
 
 prove((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
-    Current_Depth =< Max_Depth,
-    Current_Depth_ is Current_Depth + 1,
-    r_rules(Δ, (Σ, M, Γ, Γ_S, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
+    r_rules(Δ, (Σ, M, Γ, Γ_S, Δ_S), Current_Depth, Max_Depth, Used, Abducibles).
 
 % ∧ R
 r_rules(X : Alpha and Beta, (Σ, M, Γ, Γ_S, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
@@ -248,7 +249,7 @@ ac_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles
     left_arrow((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles), !.
 
 ac_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
-    cm((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles).
+    sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles).
 
 la(_ : _ -> _).
 
@@ -292,6 +293,55 @@ la_l([X <= Y | T], X : Alpha -> Beta, (Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth
 
 la_l([_ | T], X : Alpha -> Beta, (Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
     la_l(T, X : Alpha -> Beta, (Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles).
+
+% sf-refl
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    member(X, Σ),
+    append(Γ, [Δ], ΓΔ), set_principals(ΓΔ, P),
+    member(A, P),
+    \+memberchk(X : A sf A, Γ), !,
+    Current_Depth_ is Current_Depth + 1,
+    prove((Σ, M, [X : A sf A | Γ], Γ_S, Δ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
+
+% sf
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    member(s(X, B, Y), M),
+    member(X : A sf B, Γ),
+    \+memberchk(s(X, A, Y), M), !,
+    Current_Depth_ is Current_Depth + 1,
+    prove((Σ, [s(X, A, Y) | M], Γ, Γ_S, Δ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
+
+% sf-trans
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    member(X : A sf B, Γ),
+    member(X : B sf C, Γ),
+    \+memberchk(X : A sf C, Γ), !,
+    Current_Depth_ is Current_Depth + 1,
+    prove((Σ, M, [X : A sf C | Γ], Γ_S, Δ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
+
+% sf-unit
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    member(s(X, _, Y), M),
+    member(X : A sf B, Γ),
+    \+memberchk(Y : A sf B, Γ), !,
+    Current_Depth_ is Current_Depth + 1,
+    prove((Σ, M, [Y : A sf B | Γ], Γ_S, Δ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
+
+% sf-mon
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    Current_Depth =< Max_Depth,
+    member(X <= Y, M),
+    member(X : A sf B, Γ),
+    \+memberchk(Y : A sf B, Γ), !,
+    Current_Depth_ is Current_Depth + 1,
+    prove((Σ, M, [Y : A sf B | Γ], Γ_S, Δ, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
+
+sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
+    cm((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles).
 
 % CM
 cm((Σ, M, Γ, Γ_S, Δ, Δ_S), _, _, _, (Σ, M, Γ, Γ_S, Δ, Δ_S)).
