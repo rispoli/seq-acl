@@ -298,7 +298,7 @@ la_l([_ | T], X : Alpha -> Beta, (Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max
 sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
     Current_Depth =< Max_Depth,
     member(X, Σ),
-    append(Γ, [Δ], ΓΔ), set_principals(ΓΔ, P),
+    append([Γ, Γ_S, [Δ], Δ_S], ΓΔ), set_principals(ΓΔ, P),
     member(A, P),
     \+memberchk(X : A sf A, Γ), !,
     Current_Depth_ is Current_Depth + 1,
