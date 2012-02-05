@@ -193,7 +193,7 @@ ac_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
 % sf-refl
 sf_rules((Σ, M, Γ, Γ_S, Δ, Δ_S), Depth, Used, Abducibles) :-
     member(X, Σ),
-    append(Γ, Δ, ΓΔ), set_principals(ΓΔ, P),
+    append([Γ, Γ_S, Δ, Δ_S], ΓΔ), set_principals(ΓΔ, P),
     member(A, P),
     \+memberchk(X : A sf A, Γ), !,
     prove((Σ, M, [X : A sf A | Γ], Γ_S, Δ, Δ_S), Depth, Used, Abducibles).
