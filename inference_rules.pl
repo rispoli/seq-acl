@@ -1,4 +1,7 @@
-:- op(450, xfy, says),
+:- [principals].
+
+:- op(400, xfy, sf),
+   op(450, xfy, says),
    op(500, yfx, and),
    op(600, yfx, or),
    op(700, xfy, ->),
@@ -95,8 +98,8 @@ r_sequents(X : N -> G, (Σ, M, Γ, Γ_S, Ξ, Δ_S), Current_Depth, Max_Depth, Us
 r_sequents(X : P, (Σ, M, Γ, Γ_S, [], Δ_S), Current_Depth, Max_Depth, Used, Abducibles) :-
     Current_Depth =< Max_Depth,
     Current_Depth_ is Current_Depth + 1,
-    !, expand_sat_sequents(Σ, M, Σ_S, M_S),
-    n_sequents((Σ_S, M_S, Γ, Γ_S, X : P, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
+    !, expand_sat_sequents(Σ, M, Γ, X : P, Σ_S, M_S, Γ_Sa),
+    n_sequents((Σ_S, M_S, Γ_Sa, Γ_S, X : P, Δ_S), Current_Depth_, Max_Depth, Used, Abducibles).
 
 match__([], _, _).
 
@@ -185,44 +188,75 @@ expand_l_sequents((Σ, M, Γ, Γ_S, Ξ, WG, Δ_S), _, _, _, (Σ, M, Γ_, Γ_S, W
     append(Γ, Ξ, Γ_).
 
 % s-mon
-sat_sequents(Σ, M, Σ, [s(X, A, W) | M]) :-
+sat_sequents(Σ, M, Γ, _, Σ, [s(X, A, W) | M], Γ) :-
     member(X <= Y, M),
     member(s(Y, A, Z), M),
     member(Z <= W, M),
     \+memberchk(s(X, A, W), M).
 
 % refl
-sat_sequents(Σ, M, Σ, [X <= X | M]) :-
+sat_sequents(Σ, M, Γ, _, Σ, [X <= X | M], Γ) :-
     member(X, Σ),
     \+memberchk(X <= X, M).
 
 % trans
-sat_sequents(Σ, M, Σ, [X <= Z | M]) :-
+sat_sequents(Σ, M, Γ, _, Σ, [X <= Z | M], Γ) :-
     member(X <= Y, M),
     member(Y <= Z, M),
     \+memberchk(X <= Z, M).
 
 % S-C
-sat_sequents(Σ, M, Σ, [s(Y, A, Y) | M]) :-
+sat_sequents(Σ, M, Γ, _, Σ, [s(Y, A, Y) | M], Γ) :-
     member(s(_, A, Y), M),
     \+memberchk(s(Y, A, Y), M).
 
 % S-I
-sat_sequents(Σ, M, Σ, [s(X, A, Z) | M]) :-
+sat_sequents(Σ, M, Γ, _, Σ, [s(X, A, Z) | M], Γ) :-
     member(s(X, _, Y), M),
     member(s(Y, A, Z), M),
     \+memberchk(s(X, A, Z), M).
 
 % unit
-%sat_sequents(Σ, M, Σ, [X <= Y | M]) :-
+%sat_sequents(Σ, M, Γ, _, Σ, [X <= Y | M], Γ) :-
 %     member(s(X, _, Y), M),
 %     \+memberchk(X <= Y, M).
 
-expand_sat_sequents(Σ, M, Σ_S, M_S) :-
-    sat_sequents(Σ, M, Σ_S_I, M_S_I), !,
-    expand_sat_sequents(Σ_S_I, M_S_I, Σ_S, M_S).
+% sf-refl
+sat_sequents(Σ, M, Γ, XP, Σ, M, [X : A sf A | Γ]) :-
+    member(X, Σ),
+    set_principals([XP | Γ], P),
+    member(A, P),
+    \+memberchk(X : A sf A, Γ).
 
-expand_sat_sequents(Σ, M, Σ, M).
+% sf
+sat_sequents(Σ, M, Γ, _, Σ, [s(X, A, Y) | M], Γ) :-
+    member(s(X, B, Y), M),
+    member(X : A sf B, Γ),
+    \+memberchk(s(X, A, Y), M).
+
+% sf-trans
+sat_sequents(Σ, M, Γ, _, Σ, M, [X : A sf C | Γ]) :-
+    member(X : A sf B, Γ),
+    member(X : B sf C, Γ),
+    \+memberchk(X : A sf C, Γ).
+
+% sf-unit
+sat_sequents(Σ, M, Γ, _, Σ, M, [Y : A sf B | Γ]) :-
+    member(s(X, _, Y), M),
+    member(X : A sf B, Γ),
+    \+memberchk(Y : A sf B, Γ).
+
+% sf-mon
+sat_sequents(Σ, M, Γ, _, Σ, M, [Y : A sf B | Γ]) :-
+    member(X <= Y, M),
+    member(X : A sf B, Γ),
+    \+memberchk(Y : A sf B, Γ).
+
+expand_sat_sequents(Σ, M, Γ, XP, Σ_S, M_S, Γ_Sa) :-
+    sat_sequents(Σ, M, Γ, XP, Σ_S_I, M_S_I, Γ_Sa_I), !,
+    expand_sat_sequents(Σ_S_I, M_S_I, Γ_Sa_I, XP, Σ_S, M_S, Γ_Sa).
+
+expand_sat_sequents(Σ, M, Γ, _, Σ, M, Γ).
 
 % init
 f_sequents(X : P, (_, M, W : P), Used, Used, []) :-
