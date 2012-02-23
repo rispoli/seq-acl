@@ -6,15 +6,15 @@
 
 empty([]).
 
-cook_abducibles((Σ, M, Γ, Γ_S, Δ, Δ_S), [Abducibles], [Countermodels]) :-
+cook_abducibles((Σ, M, Γ, Δ), [Abducibles], [Countermodels]) :-
     !, formulae(M, Δ, Abducibles_E), exclude(empty, Abducibles_E, Abducibles),
-    countermodels((Σ, M, Γ, Γ_S, Δ, Δ_S), Countermodels).
+    countermodels((Σ, M, Γ, Δ), Countermodels).
 
 cook_abducibles([], [], []).
 
-cook_abducibles([(Σ, M, Γ, Γ_S, Δ, Δ_S) | T], Abducibles, [Countermodels_H | Countermodels_T]) :-
+cook_abducibles([(Σ, M, Γ, Δ) | T], Abducibles, [Countermodels_H | Countermodels_T]) :-
     !, formulae(M, Δ, Abducibles_H_E), exclude(empty, Abducibles_H_E, Abducibles_H),
-    countermodels((Σ, M, Γ, Γ_S, Δ, Δ_S), Countermodels_H),
+    countermodels((Σ, M, Γ, Δ), Countermodels_H),
     cook_abducibles(T, Abducibles_T, Countermodels_T),
     ((Abducibles_H = []) ->
         Abducibles = Abducibles_T;
@@ -28,7 +28,7 @@ cook_abducibles([H | T], [Abducibles_H | Abducibles_T], [Countermodels_H | Count
 prove(F, Abducibles, Countermodels) :-
     depth(F, D),
     retractall(non_provable), reset_gensym,
-    prove(([u], [u <= u], [], [], [u : F], []), D, [], A_C),
+    prove(([u], [u <= u], [], [u : F]), D, [], A_C),
     ((A_C \= empty) ->
         (assert(non_provable), cook_abducibles(A_C, Abducibles, Countermodels));
         Abducibles = []).
