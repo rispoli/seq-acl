@@ -51,11 +51,11 @@ loop_(X, M, Γ, Γ_S, Δ, Δ_S, Y) :-
     loop(X, M, Γ_, Δ_, Y).
 
 ancestors(M, X, Y) :-
-    member(Y <= X, M); member(s(Y, _, X), M).
+    select(Y <= X, M, _); select(s(Y, _, X), M, _).
 
 ancestors(M, X, Y) :-
-    (member(W <= X, M); member(s(W, _, X), M)),
-    ancestors(M, W, Y).
+    (select(W <= X, M, M_); select(s(W, _, X), M, M_)),
+    ancestors(M_, W, Y).
 
 m2m10b12b((M10b12b, _, _, [], _), M10b12b) :- !.
 
