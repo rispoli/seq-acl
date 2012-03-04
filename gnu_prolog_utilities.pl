@@ -66,3 +66,8 @@ union([H|T], L, R) :-
     union(T, L, R).
 union([H|T], L, [H|R]) :-
     union(T, L, R).
+
+append([L], L) :- !.
+append([H|T], A) :-
+    append(T, R),
+    append(H, R, A).
