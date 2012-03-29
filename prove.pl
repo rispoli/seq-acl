@@ -1,6 +1,7 @@
 :- [inference_rules].
 %:- [depth].
-:- [countermodel].
+:- [abducibles].
+:- dynamic(lazy/0).
 :- dynamic(non_provable/0).
 
 cook_abducibles((_, M, _, _, WP, _), [Abducibles]) :-
@@ -26,10 +27,11 @@ prove(F, Abducibles) :-
 prove(F, Max_Depth, Abducibles) :-
     %depth(F, D),
     %max_depth(Depth, Max_Depth),
+    assert(lazy),
     retractall(non_provable), reset_gensym,
-    r_sequents(u : F, ([u], [u <= u], [], [], [], []), 0, Max_Depth, [], Countermodels),
-    ((Countermodels \= empty) ->
-        (assert(non_provable), cook_abducibles(Countermodels, Abducibles));
+    r_sequents(u : F, ([u], [u <= u], [], [], [], []), Max_Depth, [], Abducibles_),
+    ((Abducibles_ \= empty) ->
+        (assert(non_provable), cook_abducibles(Abducibles_, Abducibles));
         Abducibles = []).
 
 prove(F) :-

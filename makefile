@@ -30,7 +30,7 @@ credentials.gnu: $(PSRCS)
 	@cat inference_rules.pl | sed -e 's/\(:-\)\? \+\(op(.*)\)./:- \2./' -e s/Σ/Sigma/g -e s/Γ/Gamma/g -e s/Ξ/Xi/g -e s/Δ/Delta/g -e s/include/filter/g -e "s|:- \[\(.*\)\].|:- include('\1').|" > $(GNU_FOLDER)/inference_rules.pl
 	@cp principals.pl $(GNU_FOLDER)/principals.pl
 	@cp depth.pl $(GNU_FOLDER)/depth.pl
-	@cat countermodel.pl | sed -e s/list_to_set/sort/g > $(GNU_FOLDER)/countermodel.pl
+	@cat abducibles.pl | sed -e s/list_to_set/sort/g > $(GNU_FOLDER)/abducibles.pl
 	@cat grounder.pl | sed -e 's/\(:-\)\? \+\(op(.*)\)./:- \2./' -e s/list_to_set/sort/g -e s/include/filter/g > $(GNU_FOLDER)/grounder.pl
 	cd $(GNU_FOLDER); gplc --no-top-level -o ../credentials.gnu gnu_prolog_toplevel.pl
 	@rm -r $(GNU_FOLDER)
