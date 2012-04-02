@@ -28,7 +28,7 @@ credentials.gnu: $(PSRCS)
 	@echo -e "\n:- include('gnu_prolog_utilities')." >> $(GNU_FOLDER)/credentials.pl
 	@cat prove.pl | sed -e "s|:- \[\(.*\)\].|:- include('\1').|" -e s/\s*reset_gensym,// -e s/assert/asserta/ > $(GNU_FOLDER)/prove.pl
 	@cat inference_rules.pl | sed -e 's/\(:-\)\? \+\(op(.*)\)./:- \2./' -e s/Σ/Sigma/g -e s/Γ/Gamma/g -e s/Ξ/Xi/g -e s/Δ/Delta/g -e s/include/filter/g -e "s|:- \[\(.*\)\].|:- include('\1').|" > $(GNU_FOLDER)/inference_rules.pl
-	@cp principals.pl $(GNU_FOLDER)/principals.pl
+	@cat principals.pl | sed -e 's/says/(says)/' -e 's/sf/(sf)/' > $(GNU_FOLDER)/principals.pl
 	@cp depth.pl $(GNU_FOLDER)/depth.pl
 	@cat abducibles.pl | sed -e s/list_to_set/sort/g > $(GNU_FOLDER)/abducibles.pl
 	@cat grounder.pl | sed -e 's/\(:-\)\? \+\(op(.*)\)./:- \2./' -e s/list_to_set/sort/g -e s/include/filter/g > $(GNU_FOLDER)/grounder.pl
