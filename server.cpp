@@ -4,6 +4,7 @@
 #include <iostream>
 #include "message.h"
 #include <signal.h>
+#include "signature.h"
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,8 @@ using namespace std;
 
 string executable_path;
 string options;
+string private_key_fn;
+string public_keys_rn;
 string policy_fn;
 string log_fn;
 int log_level;
@@ -83,7 +86,7 @@ void log_message(string filename, string message) {
 DWORD WINAPI handle_query(void *lp) {
 	int &sock_fd = *(int *)lp;
 #else
-int handle_query(string executable_path, string options, int sock_fd, string policy_fn, string log_fn, int log_level, bool gnu_prolog_f, struct in_addr sin_addr) {
+int handle_query(string executable_path, string options, int sock_fd, string private_key_fn, string public_keys_rn, string policy_fn, string log_fn, int log_level, bool gnu_prolog_f, struct in_addr sin_addr) {
 	signal(SIGCHLD, SIG_DFL);
 #endif
 
@@ -109,6 +112,7 @@ int handle_query(string executable_path, string options, int sock_fd, string pol
 		if(recv(sock_fd, (RCAST *)credentials, query_metadata.credentials_size, 0) == -1) {
 			cerr << "Could not receive data (" << errno << ")" << endl;
 			closesocket(sock_fd);
+			free(principal);
 			free(credentials);
 			return 1;
 		}
@@ -118,10 +122,32 @@ int handle_query(string executable_path, string options, int sock_fd, string pol
 	if(recv(sock_fd, (RCAST *)query, query_metadata.request_size, 0) == -1) {
 		cerr << "Could not receive data (" << errno << ")" << endl;
 		closesocket(sock_fd);
+		free(principal);
 		free(query);
 		if(credentials != NULL) free(credentials);
 		return 1;
 	}
+	unsigned char *signature = (unsigned char *)malloc(query_metadata.signature_size + 1);
+	memset(signature, 0, query_metadata.signature_size + 1);
+	if(recv(sock_fd, (RCAST *)signature, query_metadata.signature_size, 0) == -1) {
+		cerr << "Could not receive signature (" << errno << ")" << endl;
+		closesocket(sock_fd);
+		free(principal);
+		free(query);
+		if(credentials != NULL) free(credentials);
+		free(signature);
+		return 1;
+	}
+	if(verify(fetch_public_key(string(principal), public_keys_rn).c_str(), query, signature, query_metadata.signature_size) != SUCCESS) {
+		cerr << "Could not verify signature" << endl;
+		closesocket(sock_fd);
+		free(principal);
+		free(query);
+		if(credentials != NULL) free(credentials);
+		free(signature);
+		return 1;
+	}
+	free(signature);
 
 	stringstream command;
 	if(credentials != NULL)
@@ -134,7 +160,8 @@ int handle_query(string executable_path, string options, int sock_fd, string pol
 			command << "./credentials.gnu " << policy_fn << " " << string(principal) << " '" << string(query) << "' | tail -n1";
 		else
 			command << executable_path << options << " \"prove_c('" << policy_fn << "', " << string(principal) << ", " << string(query) << ")\" 2>&1";
-cout << command.str() << endl;
+	free(principal);
+//cout << command.str() << endl;
 
 	FILE *fpipe;
 	char buffer_p[256];
@@ -169,11 +196,28 @@ cout << command.str() << endl;
 		}
 	}
 
+	signature = NULL;
+	unsigned int siglen = 0;
+	if(answer.status != SUCCESS)
+		signature = sign(private_key_fn.c_str(), result, &siglen);
+	else
+		signature = sign(private_key_fn.c_str(), "granted", &siglen);
+	if(signature == NULL) {
+		cerr << "Could not sign answer)" << endl;
+		closesocket(sock_fd);
+		free(query);
+		if(credentials != NULL) free(credentials);
+		free(signature);
+		return 1;
+	}
+	answer.signature_size = siglen;
+
     if(send(sock_fd, (SCAST *)&answer, sizeof(answer), 0) == -1) {
 		cerr << "Could not send answer (" << errno << ")" << endl;
 		closesocket(sock_fd);
 		free(query);
 		if(credentials != NULL) free(credentials);
+		free(signature);
 		return 1;
 	}
 	if(answer.status != SUCCESS)
@@ -182,8 +226,18 @@ cout << command.str() << endl;
 			closesocket(sock_fd);
 			free(query);
 			if(credentials != NULL) free(credentials);
+			free(signature);
 			return 1;
 		}
+	if(send(sock_fd, (SCAST *)signature, siglen, 0) == -1) {
+		cerr << "Could not send signature (" << errno << ")" << endl;
+		closesocket(sock_fd);
+		free(query);
+		if(credentials != NULL) free(credentials);
+		free(signature);
+		return 1;
+	}
+	free(signature);
 
 	if(log_level > 0) {
 		stringstream message;
@@ -224,6 +278,8 @@ int main(int argc, char *argv[]) {
 	struct arg_lit *daemon = arg_lit0("d", "daemon", "run in background");
 #endif
 	struct arg_file *executable = arg_file0("e", "executable", NULL, "Prolog executable path (default: swipl)");
+	struct arg_file *prikey = arg_file1("r", "prikey", NULL, "private key path");
+	struct arg_file *pubkeys = arg_file0("u", "pubkeys", NULL, "public keys repository path (default: keys)");
 	struct arg_file *policy = arg_file0("o", "policy", NULL, "policy path (default: policy)");
 	struct arg_int *port_number = arg_int0("p", "port-number", NULL, "port number to listen on (default: 3333)");
 	struct arg_file *log_file = arg_file0("L", "log-file", NULL, "log-file path (default: queries.log)");
@@ -231,9 +287,9 @@ int main(int argc, char *argv[]) {
 	struct arg_lit *gnu_prolog_flag = arg_lit0("g", "gnu-prolog", "use GNU Prolog version");
 	struct arg_end *end = arg_end(23);
 #ifdef __WINDOWS
-	void *argtable[] = {help, executable, policy, port_number, log_file, log_l, gnu_prolog_flag, end};
+	void *argtable[] = {help, executable, prikey, pubkeys, policy, port_number, log_file, log_l, gnu_prolog_flag, end};
 #else
-	void *argtable[] = {help, daemon, executable, policy, port_number, log_file, log_l, gnu_prolog_flag, end};
+	void *argtable[] = {help, daemon, executable, prikey, pubkeys, policy, port_number, log_file, log_l, gnu_prolog_flag, end};
 #endif
 
 	if(arg_nullcheck(argtable) != 0) {
@@ -278,6 +334,8 @@ int main(int argc, char *argv[]) {
 #ifdef __WINDOWS
 	executable_path = executable->filename[0];
 	options = " -q -t halt -f credentials.pl -g";
+	private_key_fn = prikey->filename[0];
+	public_keys_rn = pubkeys->filename[0];
 	policy_fn = policy->filename[0];
 	int port_no = port_number->ival[0];
 	log_fn = log_file->filename[0];
@@ -286,6 +344,8 @@ int main(int argc, char *argv[]) {
 #else
 	string executable_path = executable->filename[0];
 	string options = " -q -t halt -f credentials.pl -g";
+	string private_key_fn = prikey->filename[0];
+	string public_keys_rn = pubkeys->filename[0];
 	string policy_fn = policy->filename[0];
 	int port_no = port_number->ival[0];
 	string log_fn = log_file->filename[0];
@@ -392,7 +452,7 @@ int main(int argc, char *argv[]) {
 					close(termination_pipe[0]);
 					close(termination_pipe[1]);
 					getsockname(new_sock_fd, (struct sockaddr *)&serv_addr_, &serv_addr_size);
-					return handle_query(executable_path, options, new_sock_fd, policy_fn, log_fn, log_level, gnu_prolog_f, cli_addr.sin_addr);
+					return handle_query(executable_path, options, new_sock_fd, private_key_fn, public_keys_rn, policy_fn, log_fn, log_level, gnu_prolog_f, cli_addr.sin_addr);
 				default:
 					close(new_sock_fd);
 			}

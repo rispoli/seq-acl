@@ -4,7 +4,7 @@ ARGTABLE_PATH=./argtable2
 ARGTABLEI=-I$(ARGTABLE_PATH)/include
 ARGTABLEL=$(ARGTABLE_PATH)/lib
 ARGTABLEO=$(ARGTABLEL)/libargtable2.a
-LDFLAGS=-L$(ARGTABLEL)
+LDFLAGS=-L$(ARGTABLEL) -lcrypto
 
 SRCS=$(wildcard *.cpp)
 PSRCS=$(wildcard *.pl)
@@ -14,7 +14,7 @@ GNU_FOLDER=.gnu_translation
 
 all: $(EXECS) credentials.gnu
 
-%.o: %.cpp message.h
+%.o: %.cpp message.h signature.h
 	$(CC) $(CFLAGS) -c $(ARGTABLEI) $< -o $@
 
 $(EXECS): %: %.o

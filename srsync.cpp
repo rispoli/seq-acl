@@ -5,11 +5,13 @@
 #include <limits>
 #include <map>
 #include "message.h"
+#include "signature.h"
 #include <sstream>
 #include <stdlib.h>
 #include <string>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include <utility>
 #include <vector>
 using namespace std;
@@ -93,10 +95,11 @@ bool already_granted(vector<string> v, size_t b, map<pair<string, size_t>, bool>
 	return false;
 }
 
-int process_query(string whoami, string iporhostname, string credentials, string query, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
+int process_query(string whoami, string private_key_fn, string public_keys_rn, string queried_party, string credentials, string query, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
 	int sock_fd = -1;
 	size_t rv;
 	string port("3333");
+	string iporhostname = addresses[queried_party];
 
 	if((rv = iporhostname.find(":")) != string::npos) {
 		port = iporhostname.substr(rv + 1, iporhostname.length() - rv);
@@ -158,33 +161,54 @@ int process_query(string whoami, string iporhostname, string credentials, string
 
 	freeaddrinfo(serv_info);
 
+	unsigned int siglen = 0;
+	unsigned char *signature = sign(private_key_fn.c_str(), query, &siglen);
+	if(signature == NULL) {
+		cerr << "Could not sign query" << endl;
+		close_and_cleanup(sock_fd);
+		free(signature);
+		return FAILURE;
+	}
+
 	c2s_t query_metadata;
 	query_metadata.principal_size = whoami.size();
 	query_metadata.credentials_size = credentials.size();
 	query_metadata.request_size = query.size();
+	query_metadata.signature_size = siglen;
 
 	if(send(sock_fd, (SCAST *)&query_metadata, sizeof(query_metadata), 0) == -1) {
 		cerr << "Could not send query (" << errno << ")" << endl;
 		close_and_cleanup(sock_fd);
+		free(signature);
 		return FAILURE;
 	}
 
 	if(send(sock_fd, (SCAST *)whoami.c_str(), whoami.size(), 0) == -1) {
 		cerr << "Could not send principal (" << errno << ")" << endl;
 		close_and_cleanup(sock_fd);
+		free(signature);
 		return FAILURE;
 	}
 	if(credentials != "")
 		if(send(sock_fd, (SCAST *)credentials.c_str(), credentials.size(), 0) == -1) {
 			cerr << "Could not send credentials (" << errno << ")" << endl;
 			close_and_cleanup(sock_fd);
+			free(signature);
 			return FAILURE;
 		}
 	if(send(sock_fd, (SCAST *)query.c_str(), query.size(), 0) == -1) {
 		cerr << "Could not send query (" << errno << ")" << endl;
 		close_and_cleanup(sock_fd);
+		free(signature);
 		return FAILURE;
 	}
+	if(send(sock_fd, (SCAST *)signature, siglen, 0) == -1) {
+		cerr << "Could not send signature(" << errno << ")" << endl;
+		close_and_cleanup(sock_fd);
+		free(signature);
+		return FAILURE;
+	}
+	free(signature);
 
 	answer_t answer_metadata;
 	if(recv(sock_fd, (RCAST *)&answer_metadata, sizeof(answer_metadata), 0) == -1) {
@@ -204,19 +228,41 @@ int process_query(string whoami, string iporhostname, string credentials, string
 			return FAILURE;
 		}
 	}
+	signature = (unsigned char *)malloc(answer_metadata.signature_size + 1);
+	memset(signature, 0, answer_metadata.signature_size + 1);
+	if(recv(sock_fd, (RCAST *)signature, answer_metadata.signature_size, 0) == -1) {
+		cerr << "Could not receive signature (" << errno << ")" << endl;
+		close_and_cleanup(sock_fd);
+		if(answer != NULL) free(answer);
+		free(signature);
+		return FAILURE;
+	}
+	int verification = FAILURE;
+	if(answer_metadata.status == SUCCESS)
+		verification = verify(fetch_public_key(queried_party, public_keys_rn).c_str(), "granted", signature, query_metadata.signature_size);
+	else
+		verification = verify(fetch_public_key(queried_party, public_keys_rn).c_str(), string(answer), signature, query_metadata.signature_size);
+	if(verification != SUCCESS) {
+		cerr << "Could not verify signature" << endl;
+		close_and_cleanup(sock_fd);
+		if(answer != NULL) free(answer);
+		free(signature);
+		return FAILURE;
+	}
+	free(signature);
 
 	close_and_cleanup(sock_fd);
 
 	if(answer_metadata.status == FAILURE) {
-		cerr << iporhostname << ":" << port << " says: " << string(answer) << endl;
+		cerr << queried_party << " (" << iporhostname << ":" << port << ") says: " << string(answer) << endl;
 		free(answer);
 		return FAILURE;
 	} else if(answer_metadata.status == SUCCESS)
 		// Move this output to main so intermediate results do not get shown?
-		cout << iporhostname << ":" << port << " says: '" << query << "' granted." << endl;
+		cout << queried_party << " (" << iporhostname << ":" << port << ") says: '" << query << "' granted." << endl;
 	else if(answer_metadata.status == COUNTERMODELS) {
 		if(!strncmp(answer, "[]", sizeof(answer_metadata.size + 1))) {
-			cerr << iporhostname << ":" << port << " says: '" << query << "' not satisfiable." << endl;
+			cerr << queried_party << " (" << iporhostname << ":" << port << ") says: '" << query << "' not satisfiable." << endl;
 			free(answer);
 			return FAILURE;
 		}
@@ -230,7 +276,7 @@ int process_query(string whoami, string iporhostname, string credentials, string
 			size_t or_choices = vor.size();
 			do {
 				stringstream or_choice_banner;
-				or_choice_banner << iporhostname << ":" << port << " says: choose one among these groups of additional credentials:" << endl;
+				or_choice_banner << queried_party << " (" << iporhostname << ":" << port << ") says: choose one among these groups of additional credentials:" << endl;
 				for(size_t j = 0; j < vor.size(); j++) {
 					if(!or_choices_index[j]) {
 						or_choice_banner << j << ". ";
@@ -266,7 +312,7 @@ int process_query(string whoami, string iporhostname, string credentials, string
 							unsigned int choices = 0;
 							do {
 								stringstream choice_banner;
-								choice_banner << iporhostname << ":" << port << " says: choose one among these additional credentials:" << endl;
+								choice_banner << queried_party << " (" << iporhostname << ":" << port << ") says: choose one among these additional credentials:" << endl;
 								choices = 0;
 								for(size_t j = 0; j < v->size(); j++)
 									if(history.find(make_pair((*v)[j], i)) == history.end() && (*v)[j] != "") {
@@ -290,7 +336,7 @@ int process_query(string whoami, string iporhostname, string credentials, string
 											cerr << "Address for '" << (*v)[c].substr(0, p - 1) << "' not found." << endl;
 										else {
 											history[make_pair((*v)[c], i)] = false;
-											return_value = process_query(whoami, addresses[(*v)[c].substr(0, p - 1)], whoami + " says " + (*v)[c], (*v)[c], addresses, interactive, history);
+											return_value = process_query(whoami, private_key_fn, public_keys_rn, (*v)[c].substr(0, p - 1), whoami + " says " + (*v)[c], (*v)[c], addresses, interactive, history);
 											history[make_pair((*v)[c], i)] = return_value == SUCCESS;
 										}
 									}
@@ -317,7 +363,7 @@ int process_query(string whoami, string iporhostname, string credentials, string
 						int return_value = FAILURE;
 						size_t j = 0;
 						if((*v)[0] != "") {
-							cout << iporhostname << ":" << port << " says: additional credentials '" << join(*v) << "'." << endl;
+							cout << queried_party << " (" << iporhostname << ":" << port << ") says: additional credentials '" << join(*v) << "'." << endl;
 							while(j < v->size() && return_value != SUCCESS) {
 								if(history.find(make_pair((*v)[j], i)) == history.end()) {
 									size_t p = (*v)[j].find("says");
@@ -326,7 +372,7 @@ int process_query(string whoami, string iporhostname, string credentials, string
 											cerr << "Address for '" << (*v)[j].substr(0, p - 1) << "' not found." << endl;
 										else {
 											history[make_pair((*v)[j], i)] = false;
-											return_value = process_query(whoami, addresses[(*v)[j].substr(0, p - 1)], whoami + " says " + (*v)[j], (*v)[j], addresses, interactive, history);
+											return_value = process_query(whoami, private_key_fn, public_keys_rn, (*v)[j].substr(0, p - 1), whoami + " says " + (*v)[j], (*v)[j], addresses, interactive, history);
 											history[make_pair((*v)[j], i)] = return_value == SUCCESS;
 										}
 									}
@@ -346,9 +392,9 @@ int process_query(string whoami, string iporhostname, string credentials, string
 			}
 		}
 		if(successesor)
-			answer_metadata.status = process_query(whoami, iporhostname + ":" + port, new_credentials.str(), query, addresses, interactive, history);
+			answer_metadata.status = process_query(whoami, private_key_fn, public_keys_rn, queried_party, new_credentials.str(), query, addresses, interactive, history);
 		else
-			cout << iporhostname << ":" << port << " says: '" << query << "' cannot be granted." << endl;
+			cout << queried_party << " (" << iporhostname << ":" << port << ") says: '" << query << "' cannot be granted." << endl;
 
 		free(answer);
 		for(size_t i = 0; i < vor.size(); i++) {
@@ -401,7 +447,7 @@ string process_credentials(const char *fn) {
 	return credentials;
 }
 
-int process_requests(string whoami, const char *fn, string credentials, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
+int process_requests(string whoami, string private_key_fn, string public_keys_rn, const char *fn, string credentials, map<string, string> addresses, bool interactive, map<pair<string, size_t>, bool> history) {
 	ifstream f(fn);
 	if(!f.is_open()) {
 		cerr << "Could not open request file" << endl;
@@ -413,7 +459,7 @@ int process_requests(string whoami, const char *fn, string credentials, map<stri
 	while(f.good()) {
 		getline(f, line);
 		if((p = line.find("@")) != string::npos) {
-			r = process_query(whoami, line.substr(line.find_first_not_of(" \t", p + 1), line.find_last_not_of(" \t") - line.find_first_not_of(" \t", p + 1) + 1), credentials, line.substr(0, line.find_last_not_of(" \t", p - 1) + 1), addresses, interactive, history);
+			r = process_query(whoami, private_key_fn, public_keys_rn, line.substr(line.find_first_not_of(" \t", p + 1), line.find_last_not_of(" \t") - line.find_first_not_of(" \t", p + 1) + 1), credentials, line.substr(0, line.find_last_not_of(" \t", p - 1) + 1), addresses, interactive, history);
 		} else if(line != "") {
 			cerr << "Malformed request file" << endl;
 			exit(EXIT_FAILURE);
@@ -423,7 +469,7 @@ int process_requests(string whoami, const char *fn, string credentials, map<stri
 	return r;
 }
 
-void rsync(string whoami, const char *fn) {
+void rsync(string whoami, const char *fn, map<string, string> addresses) {
 	ifstream f(fn);
 	if(!f.is_open()) {
 		cerr << "Could not open request file" << endl;
@@ -435,7 +481,8 @@ void rsync(string whoami, const char *fn) {
 		getline(f, line);
 		size_t p;
 		if((p = line.find("@")) != string::npos) {
-			rsync_cmd << "rsync -a " << whoami << "@" << line.substr(line.find_first_not_of(" \t", p + 1), ((line.find_last_of(":") != string::npos) ? line.find_last_of(":") - 1 : line.find_last_not_of(" \t")) - line.find_first_not_of(" \t", p + 1) + 1) << "::" << line.substr(0, line.find_last_not_of(" \t", p - 1) + 1) << " " << line.substr(0, line.find_last_not_of(" \t", p - 1) + 1); // << " 2>&1";
+			string adr = addresses[line.substr(line.find_first_not_of(" \t", p + 1), line.find_last_not_of(" \t") - line.find_first_not_of(" \t", p + 1) + 1)];
+			rsync_cmd << "rsync -a " << whoami << "@" << adr.substr(0, adr.find_first_of(":")) << "::" << line.substr(0, line.find_last_not_of(" \t", p - 1) + 1) << " " << line.substr(0, line.find_last_not_of(" \t", p - 1) + 1); // << " 2>&1";
 			cout << rsync_cmd.str() << endl;
 		} else if(line != "") {
 			cerr << "Malformed request file" << endl;
@@ -458,12 +505,14 @@ void rsync(string whoami, const char *fn) {
 int main(int argc, char *argv[]) {
 	struct arg_lit *help = arg_lit0("h", "help", "print this help and exit");
 	struct arg_str *whoami = arg_str1("w", "whoami", NULL, "name of the principal issuing the requests");
+	struct arg_file *prikey = arg_file1("p", "prikey", NULL, "private key of the principal issuing the requests");
+	struct arg_file *pubkeys = arg_file0("k", "pubkeys", NULL, "public keys repository path (default: keys)");
 	struct arg_file *credentials = arg_file0("c", "credentials", NULL, "credentials path (default: credentials)");
 	struct arg_file *request = arg_file0("r", "request", NULL, "request path (default: request)");
 	struct arg_file *addresses = arg_file0("a", "addresses", NULL, "addresses path (default: addresses)");
 	struct arg_lit *interactive = arg_lit0("i", "interactive", "interactively choose which additional credential to request");
 	struct arg_end *end = arg_end(23);
-	void *argtable[] = {help, whoami, credentials, request, addresses, interactive, end};
+	void *argtable[] = {help, whoami, prikey, pubkeys, credentials, request, addresses, interactive, end};
 
 	if(arg_nullcheck(argtable) != 0) {
 		cerr << "Could not allocate enough memory for command line arguments" << endl;
@@ -471,6 +520,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	pubkeys->filename[0] = "keys";
 	credentials->filename[0] = "credentials";
 	request->filename[0] = "request";
 	addresses->filename[0] =  "addresses";
@@ -493,13 +543,14 @@ int main(int argc, char *argv[]) {
 
 	int r;
 	map<pair<string, size_t>, bool> history;
+	map<string, string> addresses_ = process_addresses(addresses->filename[0]);
 	if(credentials->count > 0)
-		r = process_requests(whoami->sval[0], request->filename[0], process_credentials(credentials->filename[0]), process_addresses(addresses->filename[0]), interactive->count > 0, history);
+		r = process_requests(whoami->sval[0], prikey->filename[0], pubkeys->filename[0], request->filename[0], process_credentials(credentials->filename[0]), addresses_, interactive->count > 0, history);
 	else
-		r = process_requests(whoami->sval[0], request->filename[0], "", process_addresses(addresses->filename[0]), interactive->count > 0, history);
+		r = process_requests(whoami->sval[0], prikey->filename[0], pubkeys->filename[0], request->filename[0], "", addresses_, interactive->count > 0, history);
 
 	if(r == SUCCESS)
-		rsync(whoami->sval[0], request->filename[0]);
+		rsync(whoami->sval[0], request->filename[0], addresses_);
 
 	arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
 
