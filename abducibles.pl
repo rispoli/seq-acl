@@ -19,22 +19,15 @@
 
 */
 
-formulae(_, [], []) :- !.
+foldl(_, Z, [], Z) :- !.
+foldl(F, Z, [H | T], O) :-
+    C =.. [F, Z, H, Z_],
+    C,
+    foldl(F, Z_, T, O).
 
-formulae(M, [Y : P | T], [Ps | Formulae]) :-
+ab(M, Y : P, Ps) :-
     (atom(P); P = _ sf _), !,
     findall(P, member(u <= Y, M), Ys),
     findall(A says P, member(s(u, A, Y), M), SYs),
-    append(Ys, SYs, YsSYs), list_to_set(YsSYs, Ps),
-    formulae(M, T, Formulae).
-
-formulae(M, [_ | T], Formulae) :-
-    formulae(M, T, Formulae).
-
-formulae(M, Y : P, Ps) :-
-    (atom(P); P = _ sf _), !,
-    findall(P, member(u <= Y, M), Ys),
-    findall(A says P, member(s(u, A, Y), M), SYs),
-    append(Ys, SYs, YsSYs), list_to_set(YsSYs, Ps).
-
-formulae(_, _, []).
+    append(Ys, SYs, YsSYs), list_to_set(YsSYs, Ps_), foldl(or_ab, false_ab, Ps_, Ps).
+ab(_, _, false_ab).

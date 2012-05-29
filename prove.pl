@@ -21,26 +21,39 @@
 
 :- [inference_rules].
 %:- [depth].
-:- [abducibles].
 :- dynamic(lazy/0).
 :- dynamic(non_provable/0).
 
-cook_abducibles((_, M, _, _, WP, _), [Abducibles]) :-
-    !, formulae(M, WP, Abducibles).
+inf2pre(PandorQ, Pre) :-
+    PandorQ =.. [Functor | [P | Q]],
+    !, inf2pre(P, P_),
+    ((P_ =.. [Functor | P_a], !); P_a = [P_]),
+    append(P_a, Q, Pre_a),
+    Pre =.. [Functor | Pre_a].
+inf2pre(P, P) :-
+    atom(P).
 
-cook_abducibles([], []).
+dnf(F, DNF) :-
+    inf2pre(F, F_p),
+    dnf_(F_p, DNF).
+dnf_(A says P, A says P).
+dnf_(P, P) :-
+    atom(P), !.
+dnf_(F, DNF) :-
+    F =.. [Functor | Args],
+    maplist(dnf_, Args, Args_DNF),
+    ((Functor = (or)) ->
+        (!, DNF =.. [Functor | Args_DNF]);
+        (findall(P and Q, (member(OPs, Args_DNF), member(OQs, Args_DNF), OPs \= OQs, ((OPs =.. [or | Ps], !); Ps = [OPs]), ((OQs =.. [or | Qs], !); Qs = [OQs]), member(P, Ps), member(Q, Qs)), PsAndQs),
+        delete_comm(PsAndQs, PsAndQs, PsAndQs_),
+        foldl(or_ab, false_ab, PsAndQs_, DNF))).
 
-cook_abducibles([(_, M, _, _, WP, _) | T], Abducibles) :-
-    !, formulae(M, WP, Abducibles_H),
-    cook_abducibles(T, Abducibles_T),
-    ((Abducibles_H = []) ->
-        Abducibles = Abducibles_T;
-        (is_list(WP) -> append(Abducibles_H, Abducibles_T, Abducibles); Abducibles = [Abducibles_H | Abducibles_T])).
-
-cook_abducibles([H | T], [Abducibles_H | Abducibles_T]) :-
-    is_list(H),
-    cook_abducibles(H, Abducibles_H),
-    cook_abducibles(T, Abducibles_T).
+delete_comm([], L, L).
+delete_comm([P and Q | _], L, L_) :-
+    select(Q and P, L, L__), !,
+    delete_comm(L__, L__, L_).
+delete_comm([_ | T], L, L_) :-
+    delete_comm(T, L, L_).
 
 prove(F, Abducibles) :-
     prove(F, 10000000, Abducibles).
@@ -51,8 +64,8 @@ prove(F, Max_Depth, Abducibles) :-
     assert(lazy),
     retractall(non_provable), reset_gensym,
     r_sequents(u : F, ([u], [u <= u], [], [], [], []), Max_Depth, [], Abducibles_),
-    ((Abducibles_ \= empty) ->
-        (assert(non_provable), cook_abducibles(Abducibles_, Abducibles));
+    ((Abducibles_ \= true_ab) ->
+        (assert(non_provable), dnf(Abducibles_, Abducibles));
         Abducibles = []).
 
 prove(F) :-
